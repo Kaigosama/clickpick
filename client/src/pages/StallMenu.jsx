@@ -1,0 +1,1057 @@
+import { useState, useEffect, useContext } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import api from '../services/api.js';
+import { AuthContext } from '../context/AuthContext.jsx';
+import { useCart } from '../context/CartContext.jsx';
+import ProductDetail from '../components/ProductDetail.jsx';
+import CartPreview from '../components/CartPreview.jsx';
+import EditItemModal from '../components/EditItemModal.jsx';
+import AddItemModal from '../components/AddItemModal.jsx';
+
+const StallMenu = () => {
+  const { stallId } = useParams();
+  const navigate = useNavigate();
+  const { user, logout } = useContext(AuthContext);
+  const { cartItems, addToCart, removeFromCart, cartTotal, clearCart } = useCart();
+  const [items, setItems] = useState([]);
+  const [itemQuantities, setItemQuantities] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showCartPreview, setShowCartPreview] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('products');
+  const [orders, setOrders] = useState([]);
+  const [showQueueFlow, setShowQueueFlow] = useState(true);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [selectedProof, setSelectedProof] = useState(null);
+  const [salesOrders, setSalesOrders] = useState([]);
+  const defaultStalls = [
+    { id: 'default-1', name: 'Store 1', logo: '🍔' },
+    { id: 'default-2', name: 'Store 2', logo: '🍜' },
+    { id: 'default-3', name: 'Store 3', logo: '🍕' },
+    { id: 'default-4', name: 'Store 4', logo: '🍱' },
+    { id: 'default-5', name: 'Store 5', logo: '🍲' },
+    { id: 'default-6', name: 'Store 6', logo: '🥘' },
+    { id: 'default-7', name: 'Store 7', logo: '🍛' },
+    { id: 'default-8', name: 'Store 8', logo: '🥙' },
+  ];
+  const [stalls, setStalls] = useState(defaultStalls);
+
+  const stall = stalls.find((entry) => entry.id === stallId) || {
+    name: 'Store',
+    logo: '🍽️'
+  };
+  const isStaff = user?.role === 'stall_staff';
+
+  const resolveItemImage = (image) => {
+    if (!image) return null;
+    return image.startsWith('http') ? image : `http://localhost:5000${image}`;
+  };
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/');
+      return;
+    }
+    
+    // Staff will start on products tab by default
+    
+    api.get(`/menu?stall=${stallId}`)
+      .then(res => setItems(res.data))
+      .catch(err => {
+        console.error(err);
+        setItems([
+          { _id: '1', name: 'Burger', price: 75, isAvailable: true, stall: stallId },
+          { _id: '2', name: 'Fries', price: 45, isAvailable: true, stall: stallId },
+          { _id: '3', name: 'Drink', price: 35, isAvailable: true, stall: stallId },
+        ]);
+      })
+      .finally(() => setLoading(false));
+  }, [user, navigate, stallId, isStaff]);
+
+  useEffect(() => {
+    const fetchStalls = async () => {
+      try {
+        const res = await api.get('/auth/stalls');
+        const list = Array.isArray(res.data) ? res.data : res.data?.stalls;
+        if (!list || list.length === 0) {
+          return;
+        }
+
+        const mappedStalls = list.map((entry, index) => ({
+          id: entry._id,
+          name: entry.name,
+          logo: defaultStalls[index % defaultStalls.length].logo,
+          logoUrl: entry.logoUrl || null
+        }));
+        setStalls(mappedStalls);
+      } catch (err) {
+        console.error('Error fetching stalls:', err);
+      }
+    };
+
+    fetchStalls();
+  }, [defaultStalls.length]);
+
+  // Fetch orders for staff
+  useEffect(() => {
+    if (isStaff) {
+      const fetchOrders = async () => {
+        try {
+          const res = await api.get(`/orders`);
+          const activeOrders = res.data.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+          setOrders(activeOrders);
+        } catch (err) {
+          console.error('Error fetching orders:', err);
+        }
+      };
+
+      const fetchSalesOrders = async () => {
+        try {
+          const res = await api.get(`/orders`);
+          const completedOrders = res.data.filter(o => o.status === 'completed');
+          setSalesOrders(completedOrders);
+        } catch (err) {
+          console.error('Error fetching sales orders:', err);
+        }
+      };
+      
+      const fetchPendingPayments = async () => {
+        try {
+          const res = await api.get('/payments/pending-payments');
+          console.log('Fetched pending payments:', res.data);
+          setPendingPayments(res.data.payments || []);
+        } catch (err) {
+          console.error('Error fetching pending payments:', err);
+        }
+      };
+      
+      fetchOrders();
+      fetchPendingPayments();
+      fetchSalesOrders();
+      const interval = setInterval(() => {
+        fetchOrders();
+        fetchPendingPayments();
+        fetchSalesOrders();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isStaff]);
+
+  const handleExportSales = () => {
+    if (!salesOrders.length) {
+      alert('No sales data to export.');
+      return;
+    }
+
+    const rows = salesOrders.map((order) => {
+      const placedAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A';
+      const completedAt = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A';
+      const items = order.items?.map(i => i.name).join(', ') || 'N/A';
+      const orderId = order.queueNumber || order._id;
+      const payment = order.paymentMethod?.toUpperCase() || 'CASH';
+      return [placedAt, items, orderId, payment, completedAt];
+    });
+
+    const header = ['ORDER PLACED DATE/TIME', 'ITEM', 'ORDER ID', 'PAYMENT', 'ORDER COMPLETED DATE/TIME'];
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sales-report.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) {
+      alert("Cart is empty!");
+      return;
+    }
+
+    try {
+      const orderData = {
+        customerId: user._id,
+        items: cartItems.map(item => ({
+          menuItemId: item._id,
+          name: item.name,
+          quantity: item.quantity || 1,
+          price: item.price
+        })),
+        totalAmount: cartTotal,
+        paymentMethod: 'cash'
+      };
+
+      await api.post('/orders', orderData);
+      alert("Order Placed Successfully! Your order number will be displayed.");
+      clearCart();
+      navigate('/my-orders');
+    } catch (err) {
+      console.error(err);
+      alert("Checkout Failed: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await api.put(`/orders/${orderId}`, { status: newStatus });
+      setOrders(orders.map(o => 
+        o._id === orderId ? { ...o, status: newStatus } : o
+      ));
+    } catch (err) {
+      console.error('Error updating order:', err);
+      alert('Failed to update order status');
+    }
+  };
+
+  const approvePayment = async (paymentId) => {
+    try {
+      await api.post(`/payments/gcash-approve/${paymentId}`, {
+        stallId: user._id
+      });
+      alert("Payment approved successfully!");
+      // Refresh both payments and orders
+      const paymentsRes = await api.get('/payments/pending-payments');
+      setPendingPayments(paymentsRes.data.payments || []);
+      const ordersRes = await api.get(`/orders`);
+      const activeOrders = ordersRes.data.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+      setOrders(activeOrders);
+    } catch (err) {
+      alert("Failed to approve payment: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const rejectPayment = async (paymentId) => {
+    const reason = prompt("Enter reason for rejection:");
+    if (!reason) return;
+
+    try {
+      await api.post(`/payments/gcash-reject/${paymentId}`, {
+        reason: reason
+      });
+      alert("Payment rejected");
+      const res = await api.get('/payments/pending-payments');
+      setPendingPayments(res.data.payments || []);
+    } catch (err) {
+      alert("Failed to reject payment");
+    }
+  };
+
+  // Helper functions for queue management
+  const getPendingOrders = () => {
+    return orders
+      .filter(o => o.status?.toLowerCase() === 'pending')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  };
+
+  const getPreparingOrders = () => {
+    return orders
+      .filter(o => o.status?.toLowerCase() === 'preparing')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  };
+
+  const getReadyOrders = () => {
+    return orders
+      .filter(o => o.status?.toLowerCase() === 'ready')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  };
+
+  const getQueueStats = () => {
+    const pending = getPendingOrders().length;
+    const preparing = getPreparingOrders().length;
+    const ready = getReadyOrders().length;
+    return { pending, preparing, ready, total: pending + preparing + ready };
+  };
+
+  if (!stall) {
+    return <div className="text-center py-12">Stall not found</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header Navigation - staff or customer */}
+      {!isStaff ? (
+        <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
+              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
+              <span className="text-xl font-bold">ClickPick</span>
+            </div>
+
+            <nav className="flex items-center gap-8">
+              <button 
+                onClick={() => navigate('/menu')}
+                className="hover:opacity-80 font-semibold text-lg"
+              >
+                STORES
+              </button>
+              <button 
+                onClick={() => navigate('/my-orders')}
+                className="hover:opacity-80 font-semibold text-lg"
+              >
+                MY ORDERS
+              </button>
+            </nav>
+
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                  <div className="w-8 h-8 bg-white rounded-full" />
+                  <div className="flex items-center gap-1">
+                    <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
+                    <p className="text-xs">▼</p>
+                  </div>
+                </button>
+
+                {showProfileMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48">
+                    <button
+                      onClick={() => {
+                        navigate('/store-profile');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      🏪 Edit Store Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+      ) : (
+        <header className="bg-[#8B0000] text-white shadow sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
+              <div className="hidden sm:block">
+                <span className="text-lg font-semibold">ClickPick Canteen Dashboard</span>
+              </div>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-8">
+              <button 
+                onClick={() => setActiveTab('products')}
+                className={`font-semibold transition-all ${activeTab === 'products' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
+              >
+                PRODUCTS
+              </button>
+              <button 
+                onClick={() => setActiveTab('orders')}
+                className={`font-semibold transition-all ${activeTab === 'orders' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
+              >
+                ORDERS
+              </button>
+              <button 
+                onClick={() => setActiveTab('sales')}
+                className={`font-semibold transition-all ${activeTab === 'sales' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
+              >
+                SALES
+              </button>
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`font-semibold transition-all ${activeTab === 'settings' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
+              >
+                SETTINGS
+              </button>
+            </nav>
+
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex flex-col text-right mr-2">
+                <span className="font-semibold text-sm uppercase">{(user?.name || 'DELA CRUZ, JUAN A.').toUpperCase()}</span>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#8B0000] font-bold"
+                >
+                  {user?.name?.charAt(0) || 'D'}
+                </button>
+
+                {showProfileMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-40">
+                    <button
+                      onClick={() => {
+                        navigate('/store-profile');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      🏪 Edit Store Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {isStaff && activeTab === 'orders' ? (
+          // ORDERS TAB - FIFO Queue
+          <>
+            {/* PENDING GCASH PAYMENTS SECTION */}
+            {pendingPayments.length > 0 && (
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 mb-6 text-white">
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+                  💳 Pending GCash Payments 
+                  <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm">
+                    {pendingPayments.length}
+                  </span>
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingPayments.map(payment => (
+                    <div key={payment._id} className="bg-white bg-opacity-95 rounded-lg p-4 text-gray-900 border-2 border-orange-400">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-xs text-gray-600 mb-1">Queue Number</p>
+                          <p className="text-lg font-bold text-orange-600">#{payment.orderDbId?.queueNumber || 'N/A'}</p>
+                        </div>
+                        <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">
+                          PENDING
+                        </span>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                        <p className="text-sm mb-1">
+                          <strong>Customer:</strong> {payment.customerId?.name || 'N/A'}
+                        </p>
+                        <p className="text-sm mb-1">
+                          <strong>Amount:</strong> ₱{payment.amount?.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(payment.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+
+                      {/* Proof of Payment */}
+                      <div className="mb-3">
+                        <p className="text-xs font-bold mb-2">Proof of Payment:</p>
+                        {payment.proofOfPaymentUrl ? (
+                          <div className="relative">
+                            <img 
+                              src={`http://localhost:5000${payment.proofOfPaymentUrl}`} 
+                              alt="Proof of Payment" 
+                              className="w-full h-32 object-cover rounded-lg border-2 border-gray-300 cursor-pointer hover:opacity-90"
+                              onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                              onError={(e) => {
+                                console.error('Image load error:', e.target.src);
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'block';
+                              }}
+                            />
+                            <div style={{ display: 'none' }} className="text-red-600 text-xs">Image failed to load</div>
+                            <button
+                              onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                              className="absolute top-1 right-1 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs hover:bg-opacity-90"
+                            >
+                              🔍 View
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-400 text-xs">No image uploaded</p>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => approvePayment(payment._id)}
+                          className="bg-green-500 text-white py-2 px-3 rounded font-semibold text-sm hover:bg-green-600 transition-all"
+                        >
+                          ✅ Approve
+                        </button>
+                        <button
+                          onClick={() => rejectPayment(payment._id)}
+                          className="bg-red-500 text-white py-2 px-3 rounded font-semibold text-sm hover:bg-red-600 transition-all"
+                        >
+                          ❌ Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Image Modal */}
+            {selectedProof && (
+              <div 
+                onClick={() => setSelectedProof(null)}
+                className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 cursor-pointer"
+              >
+                <div className="relative max-w-4xl max-h-screen p-4">
+                  <button
+                    onClick={() => setSelectedProof(null)}
+                    className="absolute -top-12 right-0 bg-white text-gray-900 px-4 py-2 rounded-lg font-bold hover:bg-gray-200"
+                  >
+                    ✕ Close
+                  </button>
+                  <img 
+                    src={selectedProof} 
+                    alt="Proof of Payment Full View" 
+                    className="max-w-full max-h-screen rounded-lg shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gradient-to-br from-[#c41e3a] to-[#8B0000] rounded-lg shadow-lg p-8 text-white">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold">📋 Live Orders Queue (FIFO)</h2>
+              <button
+                onClick={() => setShowQueueFlow(!showQueueFlow)}
+                className="bg-white text-[#8B0000] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm"
+              >
+                {showQueueFlow ? '📊 List View' : '🔄 Queue Flow'}
+              </button>
+            </div>
+
+            {/* Queue Statistics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              <div className="bg-yellow-400 bg-opacity-20 p-4 rounded-lg border-2 border-yellow-400">
+                <p className="text-yellow-200 text-sm font-semibold mb-1">⏳ Pending</p>
+                <p className="text-3xl font-bold">{getQueueStats().pending}</p>
+              </div>
+              <div className="bg-orange-400 bg-opacity-20 p-4 rounded-lg border-2 border-orange-400">
+                <p className="text-orange-200 text-sm font-semibold mb-1">👨‍🍳 Preparing</p>
+                <p className="text-3xl font-bold">{getQueueStats().preparing}</p>
+              </div>
+              <div className="bg-green-400 bg-opacity-20 p-4 rounded-lg border-2 border-green-400">
+                <p className="text-green-200 text-sm font-semibold mb-1">✅ Ready</p>
+                <p className="text-3xl font-bold">{getQueueStats().ready}</p>
+              </div>
+              <div className="bg-white bg-opacity-10 p-4 rounded-lg border-2 border-white border-opacity-30">
+                <p className="text-gray-200 text-sm font-semibold mb-1">📈 Total</p>
+                <p className="text-3xl font-bold">{getQueueStats().total}</p>
+              </div>
+            </div>
+
+            {/* Queue Flow Visualization */}
+            {showQueueFlow && getQueueStats().total > 0 && (
+              <div className="bg-white bg-opacity-10 p-6 rounded-lg mb-8 overflow-x-auto">
+                <div className="flex items-center gap-2 min-w-max pb-2">
+                  {getPendingOrders().map((order, idx) => (
+                    <div key={order._id} className="flex items-center">
+                      <div className="w-14 h-14 rounded-full bg-yellow-400 text-gray-900 flex items-center justify-center font-bold text-sm text-center">
+                        <div>
+                          <p className="text-xs">#{order.queueNumber}</p>
+                        </div>
+                      </div>
+                      {idx < getPendingOrders().length - 1 && <div className="text-yellow-400 text-2xl mx-2">→</div>}
+                    </div>
+                  ))}
+                  {getPendingOrders().length > 0 && getPreparingOrders().length > 0 && <div className="text-orange-400 text-2xl mx-3">⬇️</div>}
+                  {getPreparingOrders().map((order, idx) => (
+                    <div key={order._id} className="flex items-center">
+                      <div className="w-14 h-14 rounded-full bg-orange-400 text-white flex items-center justify-center font-bold text-sm text-center">
+                        <div>
+                          <p className="text-xs">#{order.queueNumber}</p>
+                        </div>
+                      </div>
+                      {idx < getPreparingOrders().length - 1 && <div className="text-orange-400 text-2xl mx-2">→</div>}
+                    </div>
+                  ))}
+                  {getPreparingOrders().length > 0 && getReadyOrders().length > 0 && <div className="text-green-400 text-2xl mx-3">⬇️</div>}
+                  {getReadyOrders().map((order, idx) => (
+                    <div key={order._id} className="flex items-center">
+                      <div className="w-14 h-14 rounded-full bg-green-400 text-white flex items-center justify-center font-bold text-sm text-center">
+                        <div>
+                          <p className="text-xs">#{order.queueNumber}</p>
+                        </div>
+                      </div>
+                      {idx < getReadyOrders().length - 1 && <div className="text-green-400 text-2xl mx-2">→</div>}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-gray-300 text-xs mt-3">🟡 Pending → 🟠 Preparing → 🟢 Ready</p>
+              </div>
+            )}
+
+            {/* Orders by Status - List View */}
+            {!showQueueFlow && (
+              <div className="space-y-8">
+                {/* Pending Orders */}
+                {getPendingOrders().length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-400 mb-4">⏳ Pending Orders</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {getPendingOrders().map(order => (
+                        <div key={order._id} className="bg-yellow-400 bg-opacity-15 border-2 border-yellow-400 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
+                            </div>
+                            <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">PENDING</span>
+                          </div>
+                          <p className="text-sm mb-2"><strong>Items:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Amount:</strong></p>
+                              <p className="text-sm">₱{order.totalAmount}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Payment:</strong></p>
+                              <p className="text-sm font-semibold">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => updateOrderStatus(order._id, 'preparing')} className="w-full bg-orange-400 text-white py-2 rounded font-semibold hover:bg-orange-500 transition-all">Start Preparing</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preparing Orders */}
+                {getPreparingOrders().length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold text-orange-400 mb-4">👨‍🍳 Preparing Orders</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {getPreparingOrders().map(order => (
+                        <div key={order._id} className="bg-orange-400 bg-opacity-15 border-2 border-orange-400 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
+                            </div>
+                            <span className="bg-orange-400 text-white px-2 py-1 rounded text-xs font-bold">PREPARING</span>
+                          </div>
+                          <p className="text-sm mb-2"><strong>Items:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Amount:</strong></p>
+                              <p className="text-sm">₱{order.totalAmount}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Payment:</strong></p>
+                              <p className="text-sm font-semibold">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => updateOrderStatus(order._id, 'ready')} className="flex-1 bg-green-500 text-white py-2 rounded font-semibold hover:bg-green-600 transition-all">Order Ready</button>
+                            <button onClick={() => updateOrderStatus(order._id, 'pending')} className="flex-1 bg-yellow-400 text-gray-900 py-2 rounded font-semibold hover:bg-yellow-500 transition-all">Back</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ready Orders */}
+                {getReadyOrders().length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold text-green-400 mb-4">✅ Ready (Awaiting Pickup)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {getReadyOrders().map(order => (
+                        <div key={order._id} className="bg-green-400 bg-opacity-15 border-2 border-green-400 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
+                            </div>
+                            <span className="bg-green-400 text-white px-2 py-1 rounded text-xs font-bold">READY</span>
+                          </div>
+                          <p className="text-sm mb-2"><strong>Items:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Amount:</strong></p>
+                              <p className="text-sm">₱{order.totalAmount}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs opacity-75"><strong>Payment:</strong></p>
+                              <p className="text-sm font-semibold">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => updateOrderStatus(order._id, 'completed')} className="w-full bg-gray-400 text-white py-2 rounded font-semibold hover:bg-gray-500 transition-all">Mark as Picked Up</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {getQueueStats().total === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Empty State */}
+            {getQueueStats().total === 0 && showQueueFlow && (
+              <div className="text-center py-12">
+                <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
+              </div>
+            )}
+          </div>
+          </>
+        ) : isStaff && activeTab === 'sales' ? (
+          <div className="bg-white rounded-lg shadow border border-gray-200 p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => setActiveTab('orders')}
+                className="text-sm font-semibold text-gray-600 hover:text-gray-900"
+              >
+                ← Back
+              </button>
+              <h2 className="text-3xl md:text-4xl font-black tracking-wide text-gray-900">SALES</h2>
+              <div className="w-16" />
+            </div>
+
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-5 gap-2 bg-gray-100 text-xs font-bold text-gray-700 uppercase px-4 py-3">
+                <div>Order Placed Date/Time</div>
+                <div>Item</div>
+                <div>Order ID</div>
+                <div>Payment</div>
+                <div>Order Completed Date/Time</div>
+              </div>
+
+              <div className="max-h-[420px] overflow-y-auto">
+                {salesOrders.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-gray-500">No completed orders yet.</div>
+                ) : (
+                  salesOrders.map((order) => (
+                    <div key={order._id} className="grid grid-cols-5 gap-2 border-t border-gray-200 px-4 py-3 text-sm text-gray-700">
+                      <div>{order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
+                      <div>{order.items?.map(i => i.name).join(', ') || 'N/A'}</div>
+                      <div>{order.queueNumber || order._id}</div>
+                      <div>{order.paymentMethod?.toUpperCase() || 'CASH'}</div>
+                      <div>{order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A'}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={handleExportSales}
+                className="px-4 py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Export Data
+              </button>
+            </div>
+          </div>
+        ) : isStaff && activeTab === 'settings' ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-500 text-lg">Settings (Coming Soon)</p>
+          </div>
+        ) : (
+          // PRODUCTS TAB
+          <div>
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-8 border-b-4 border-[#8B0000]">
+              <div className="flex items-center gap-6 mb-4">
+                <div className="w-20 h-20 bg-[#8B0000] rounded-lg flex items-center justify-center text-5xl overflow-hidden">
+                  {stall.logoUrl ? (
+                    <img
+                      src={`http://localhost:5000${stall.logoUrl}`}
+                      alt={`${stall.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    stall.logo
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">{stall.name}</h1>
+                  <p className="text-gray-600 mt-1">Menu Items</p>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">Loading menu items...</div>
+            ) : (
+              isStaff ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  {items.length === 0 ? (
+                    <>
+                      <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center py-12 bg-white rounded-lg">
+                        No menu items available for this stall
+                      </div>
+                      <div className="bg-white rounded-lg border-4 border-dashed border-gray-300 shadow flex items-center justify-center cursor-pointer hover:scale-105 transform duration-200">
+                        <button
+                          onClick={() => setShowAddItemModal(true)}
+                          className="flex flex-col items-center justify-center p-8 text-gray-500 w-full h-full"
+                        >
+                          <div className="w-20 h-20 rounded border border-gray-300 flex items-center justify-center text-4xl">+</div>
+                          <p className="mt-3 font-semibold">Add Item</p>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {items.map(item => (
+                        <div
+                          key={item._id}
+                          onClick={() => setEditingItem(item)}
+                          className="bg-white rounded-lg border-4 border-gray-300 shadow hover:shadow-lg transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
+                        >
+                          <div className="p-6 flex flex-col items-center gap-3">
+                            <div className="w-28 h-28 bg-[#8B0000] rounded-md flex items-center justify-center text-3xl text-white overflow-hidden">
+                              {item.image ? (
+                                <img
+                                  src={resolveItemImage(item.image)}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>🍽️</span>
+                              )}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
+                            <p className="text-sm text-gray-600">Quantity: <span className="font-bold">{item.quantity ?? 0}</span></p>
+                            <p className={`text-xs font-semibold ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {item.quantity > 0 ? 'Available' : 'Not Available'}
+                            </p>
+                            <button
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setEditingItem(item);
+                              }}
+                              className="mt-3 px-4 py-2 border border-gray-400 rounded text-sm font-semibold hover:bg-gray-100 w-full"
+                            >
+                              Edit Item
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="bg-white rounded-lg border-4 border-dashed border-gray-300 shadow flex items-center justify-center cursor-pointer hover:scale-105 transform duration-200">
+                        <button
+                          onClick={() => setShowAddItemModal(true)}
+                          className="flex flex-col items-center justify-center p-8 text-gray-500 w-full h-full"
+                        >
+                          <div className="w-20 h-20 rounded border border-gray-300 flex items-center justify-center text-4xl">+</div>
+                          <p className="mt-3 font-semibold">Add Item</p>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {items.length === 0 ? (
+                    <div className="col-span-2 md:col-span-3 lg:col-span-4 text-center py-12 bg-white rounded-lg">
+                      No menu items available for this stall
+                    </div>
+                  ) : (
+                    items.map(item => {
+                      const availableQty = item.quantity ?? 0;
+                      const quantity = itemQuantities[item._id] || 0;
+                      const isAvailable = availableQty > 0;
+                      return (
+                        <div 
+                          key={item._id}
+                          onClick={() => setSelectedProduct(item)}
+                          className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
+                        >
+                          <div className="bg-[#8B0000] w-full aspect-square flex items-center justify-center text-5xl border-b-2 border-gray-300 overflow-hidden">
+                            {item.image ? (
+                              <img
+                                src={resolveItemImage(item.image)}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span>🍽️</span>
+                            )}
+                          </div>
+                          
+                          <div className="p-4 flex-grow flex flex-col">
+                            <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
+                            <p className="text-2xl font-bold text-gray-900 my-2">₱{item.price}</p>
+                            
+                            <p className={`text-xs mb-3 ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                              {isAvailable ? `Available: ${availableQty}` : 'Not Available'}
+                            </p>
+
+                            <div 
+                              onClick={(e) => e.stopPropagation()}
+                              className="border-2 border-gray-400 rounded px-3 py-2 mb-3"
+                            >
+                              <p className="text-center text-sm font-semibold text-gray-700">{quantity}</p>
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setItemQuantities(prev => ({
+                                      ...prev,
+                                      [item._id]: Math.max(0, quantity - 1)
+                                    }));
+                                  }}
+                                  className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                >
+                                  −
+                                </button>
+                                <span className="text-xs font-semibold text-gray-600">Qty</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setItemQuantities(prev => ({
+                                      ...prev,
+                                      [item._id]: Math.min(availableQty, quantity + 1)
+                                    }));
+                                  }}
+                                  className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            <button 
+                              disabled={!isAvailable || quantity === 0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                for (let i = 0; i < quantity; i++) {
+                                  const itemToAdd = {
+                                    ...item,
+                                    stallId: stallId
+                                  };
+                                  addToCart(itemToAdd);
+                                }
+                                setItemQuantities(prev => ({
+                                  ...prev,
+                                  [item._id]: 0
+                                }));
+                              }}
+                              className={`w-full py-2 rounded-lg font-bold transition-all text-sm ${
+                                !item.isAvailable || quantity === 0
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                  : 'bg-[#8B0000] text-white hover:bg-red-800'
+                              }`}
+                            >
+                              Add to Basket
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Basket Button - Bottom Right */}
+      {!isStaff && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => navigate('/cart')}
+            onMouseEnter={() => setShowCartPreview(true)}
+            onMouseLeave={() => setShowCartPreview(false)}
+            className="bg-[#8B0000] text-white w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold hover:bg-red-800 transition-all shadow-lg hover:shadow-xl"
+            title="View Basket"
+          >
+            🛒
+            {cartItems.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-yellow-300 text-[#8B0000] rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                {cartItems.length}
+              </span>
+            )}
+          </button>
+
+          {showCartPreview && (
+            <CartPreview 
+              cartItems={cartItems}
+              cartTotal={cartTotal}
+              onCheckoutClick={() => navigate('/cart')}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Add Item Modal - Staff Only */}
+      {showAddItemModal && isStaff && (
+        <AddItemModal
+          stallId={stallId}
+          onClose={() => setShowAddItemModal(false)}
+          onSave={(newItem) => {
+            setItems(prevItems => [...prevItems, newItem]);
+            setShowAddItemModal(false);
+          }}
+        />
+      )}
+
+      {/* Edit Item Modal - Staff Only */}
+      {editingItem && isStaff && (
+        <EditItemModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSave={(updatedItem) => {
+            setItems(prevItems =>
+              prevItems.map(i => i._id === updatedItem._id ? updatedItem : i)
+            );
+            setEditingItem(null);
+          }}
+          onDelete={(deletedItem) => {
+            setItems(prevItems =>
+              prevItems.filter(i => i._id !== deletedItem._id)
+            );
+            setEditingItem(null);
+          }}
+        />
+      )}
+
+      {/* Product Detail Modal - Customers Only */}
+      {selectedProduct && !isStaff && (
+        <ProductDetail
+          item={selectedProduct}
+          stall={stall}
+          stallId={stallId}
+          onClose={() => setSelectedProduct(null)}
+          onAddToCart={(item) => {
+            addToCart(item);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default StallMenu;
