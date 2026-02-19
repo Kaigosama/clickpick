@@ -186,10 +186,22 @@ const MyOrders = () => {
         const queueOrders = queueOrdersByStore[storeId] || [];
         if (!queueOrders.length) return null;
 
-        const firstUserOrder = userStoreOrders[0];
+        const queuedUserOrders = userStoreOrders
+          .filter((order) => Number(order?.queueNumber || 0) > 0)
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+        if (!queuedUserOrders.length) {
+          return null;
+        }
+
+        const firstUserOrder = queuedUserOrders[0];
         const positionIndex = queueOrders.findIndex((order) => String(order._id) === String(firstUserOrder._id));
         const position = positionIndex >= 0 ? positionIndex + 1 : null;
-        const userOrderIds = new Set(userStoreOrders.map((order) => String(order._id)));
+        if (!position) {
+          return null;
+        }
+
+        const userOrderIds = new Set(queuedUserOrders.map((order) => String(order._id)));
 
         return {
           storeId,
