@@ -16,9 +16,17 @@ const Checkout = () => {
   const [stalls, setStalls] = useState([]);
   const [orderSuccess, setOrderSuccess] = useState(null);
 
+  const resolveStoreId = (item) => {
+    const rawStoreId = item?.stallId ?? item?.stall;
+    if (rawStoreId && typeof rawStoreId === 'object') {
+      return String(rawStoreId._id || rawStoreId.id || rawStoreId.stallId || 'unknown');
+    }
+    return String(rawStoreId || 'unknown');
+  };
+
   // Group items by store
   const groupedByStore = cartItems.reduce((acc, item) => {
-    const storeId = item.stall || item.stallId || 1;
+    const storeId = resolveStoreId(item);
     if (!acc[storeId]) {
       acc[storeId] = [];
     }
@@ -43,7 +51,7 @@ const Checkout = () => {
   const hasConfiguredGcashNumber = (stall) => Boolean(String(stall?.gcashNumber || '').trim());
 
   const gcashAvailableForCart = Object.keys(groupedByStore).every((storeId) => {
-    const stall = stalls.find((s) => s._id === storeId);
+    const stall = stalls.find((s) => String(s._id) === String(storeId));
     return hasConfiguredGcashNumber(stall);
   });
 
@@ -54,7 +62,7 @@ const Checkout = () => {
   }, [gcashAvailableForCart, paymentMethod]);
 
   const resolveStall = (storeId) => {
-    const match = stalls.find((s) => s._id === storeId);
+    const match = stalls.find((s) => String(s._id) === String(storeId));
     if (!match) {
       return { name: 'Store', logoUrl: null };
     }

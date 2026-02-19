@@ -15,8 +15,17 @@ const GCashPayment = () => {
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
   const [stalls, setStalls] = useState([]);
   const [filesByStore, setFilesByStore] = useState({});
+
+  const resolveStoreId = (item) => {
+    const rawStoreId = item?.stallId ?? item?.stall;
+    if (rawStoreId && typeof rawStoreId === 'object') {
+      return String(rawStoreId._id || rawStoreId.id || rawStoreId.stallId || 'unknown');
+    }
+    return String(rawStoreId || 'unknown');
+  };
+
   const groupedByStore = cartItems.reduce((acc, item) => {
-    const storeId = item.stall || item.stallId || 'unknown';
+    const storeId = resolveStoreId(item);
     if (!acc[storeId]) {
       acc[storeId] = [];
     }
@@ -337,6 +346,11 @@ const GCashPayment = () => {
               <li>Total checkout amount: ₱{overallTotal.toFixed(2)}</li>
               <li>Wait for each store&apos;s approval after upload.</li>
             </ol>
+          </div>
+
+          <div className="bg-gray-900 text-green-300 rounded-lg p-4 border border-gray-700">
+            <p className="text-xs font-bold tracking-wide mb-2">DEBUG (TEMP): Grouped Store IDs</p>
+            <p className="text-xs break-all">[{Object.keys(groupedByStore).map((storeId) => `"${storeId}"`).join(', ')}]</p>
           </div>
 
           <div className="space-y-4">
