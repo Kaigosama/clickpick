@@ -10,7 +10,7 @@ const MyOrders = () => {
   const { cartItems } = useCart();
   const serverBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
   const [orders, setOrders] = useState([]);
-  const [allOrders, setAllOrders] = useState([]);
+  const [queueOrdersByStore, setQueueOrdersByStore] = useState({});
   const [loading, setLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
@@ -29,31 +29,55 @@ const MyOrders = () => {
   useEffect(() => {
     if (!user) navigate('/');
     
-    const fetchOrders = () => {
+    const fetchOrders = async () => {
       // Fetch user's orders
-      api.get(`/orders/${user?._id}`)
-        .then(res => {
-          setOrders(res.data || []);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error(err);
-          setLoading(false);
+      try {
+        const res = await api.get(`/orders/${user?._id}`);
+        const userOrders = res.data || [];
+        setOrders(userOrders);
+
+        const activeUserOrders = userOrders.filter((order) => {
+          const status = String(order?.status || '').toLowerCase();
+          return !isPendingGcashPayment(order) && (status === 'pending' || status === 'preparing');
         });
-      
-      // Fetch all orders for FIFO queue display
-      api.get('/orders')
-        .then(res => {
-          const allOrdersList = res.data || [];
-          // Sort by createdAt (oldest first for FIFO)
-          const sortedOrders = allOrdersList.sort((a, b) => 
-            new Date(a.createdAt) - new Date(b.createdAt)
-          );
-          setAllOrders(sortedOrders);
-        })
-        .catch(err => {
-          console.error('Error fetching all orders:', err);
-        });
+
+        const resolveOrderStallId = (order) => {
+          if (typeof order?.stallId === 'string') return order.stallId;
+          if (order?.stallId?._id) return String(order.stallId._id);
+          const fallbackStallId = order?.items?.find((item) => item?.menuItemId?.stallId?._id)?.menuItemId?.stallId?._id;
+          return fallbackStallId ? String(fallbackStallId) : '';
+        };
+
+        const activeStoreIds = Array.from(new Set(activeUserOrders
+          .map((order) => resolveOrderStallId(order))
+          .filter(Boolean)));
+
+        if (!activeStoreIds.length) {
+          setQueueOrdersByStore({});
+          setLoading(false);
+          return;
+        }
+
+        const queueResponses = await Promise.all(
+          activeStoreIds.map(async (storeId) => {
+            const queueRes = await api.get(`/orders?stallId=${storeId}`);
+            const queueOrders = (queueRes.data || [])
+              .filter((queueOrder) => {
+                const status = String(queueOrder?.status || '').toLowerCase();
+                return !isPendingGcashPayment(queueOrder) && (status === 'pending' || status === 'preparing');
+              })
+              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+            return [storeId, queueOrders];
+          })
+        );
+
+        setQueueOrdersByStore(Object.fromEntries(queueResponses));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchOrders();
@@ -91,7 +115,6 @@ const MyOrders = () => {
       const updated = response.data;
 
       setOrders((prev) => prev.map((entry) => (entry._id === order._id ? { ...entry, ...updated } : entry)));
-      setAllOrders((prev) => prev.map((entry) => (entry._id === order._id ? { ...entry, ...updated } : entry)));
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to cancel order');
     } finally {
@@ -135,42 +158,52 @@ const MyOrders = () => {
 
   const activeOrders = orders.filter((order) => !isHistoryOrder(order));
 
-  const getQueuePosition = () => {
-    if (!orders.length || !allOrders.length) return null;
+  const resolveOrderStallId = (order) => {
+    if (typeof order?.stallId === 'string') return order.stallId;
+    if (order?.stallId?._id) return String(order.stallId._id);
+    const fallbackStallId = order?.items?.find((item) => item?.menuItemId?.stallId?._id)?.menuItemId?.stallId?._id;
+    return fallbackStallId ? String(fallbackStallId) : '';
+  };
 
-    const userActiveOrder = orders
+  const getQueueGroups = () => {
+    const activeUserOrders = orders
       .filter((order) => {
-        const status = order.status?.toLowerCase();
-        if (isPendingGcashPayment(order)) return false;
-        return status === 'pending' || status === 'preparing';
+        const status = String(order?.status || '').toLowerCase();
+        return !isPendingGcashPayment(order) && (status === 'pending' || status === 'preparing');
       })
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    if (!userActiveOrder) return null;
-    
-    // Filter pending and preparing orders only (in queue)
-    const activeOrders = allOrders.filter(o => 
-      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing') &&
-      o._id !== userActiveOrder._id
-    );
-    
-    // Count how many orders are ahead of the user's order
-    const ordersAhead = activeOrders.filter(o => 
-      new Date(o.createdAt) < new Date(userActiveOrder.createdAt)
-    ).length;
-    
-    const totalQueueLength = activeOrders.filter(o =>
-      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing')
-    ).length + 1; // +1 to include user's order
-    
-    return { position: ordersAhead + 1, total: totalQueueLength };
+    const groupedUserOrders = activeUserOrders.reduce((acc, order) => {
+      const storeId = resolveOrderStallId(order);
+      if (!storeId) return acc;
+      if (!acc[storeId]) acc[storeId] = [];
+      acc[storeId].push(order);
+      return acc;
+    }, {});
+
+    return Object.entries(groupedUserOrders)
+      .map(([storeId, userStoreOrders]) => {
+        const queueOrders = queueOrdersByStore[storeId] || [];
+        if (!queueOrders.length) return null;
+
+        const firstUserOrder = userStoreOrders[0];
+        const positionIndex = queueOrders.findIndex((order) => String(order._id) === String(firstUserOrder._id));
+        const position = positionIndex >= 0 ? positionIndex + 1 : null;
+        const userOrderIds = new Set(userStoreOrders.map((order) => String(order._id)));
+
+        return {
+          storeId,
+          storeName: getStoreName(firstUserOrder),
+          queueOrders,
+          userOrderIds,
+          position,
+          total: queueOrders.length
+        };
+      })
+      .filter(Boolean);
   };
 
-  const getPendingOrders = () => {
-    return allOrders.filter(o => 
-      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing')
-    ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  };
+  const queueGroups = getQueueGroups();
 
   const getStoreName = (order) => {
     if (order?.storeName) return order.storeName;
@@ -351,7 +384,7 @@ const MyOrders = () => {
         </div>
 
         {/* FIFO Queue Section */}
-        {getPendingOrders().length > 0 && (
+        {queueGroups.length > 0 && (
           <div className="mb-12 bg-gradient-to-br from-[#8B0000] to-red-800 rounded-lg shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -365,67 +398,70 @@ const MyOrders = () => {
               </button>
             </div>
 
-            {/* User's Position */}
-            {getQueuePosition() && (
-              <div className="bg-white bg-opacity-20 rounded-lg p-6 mb-6 border-2 border-white">
-                <div className="text-center">
-                  <p className="text-red-100 text-sm mb-2">Your Position in Queue</p>
-                  <div className="flex items-center justify-center gap-4">
-                    <div>
-                      <p className="text-5xl font-bold">{getQueuePosition().position}</p>
-                      <p className="text-red-100 text-sm mt-1">of {getQueuePosition().total}</p>
-                    </div>
-                    <div className="text-left">
-                      {getQueuePosition().position === 1 ? (
-                        <p className="text-xl font-bold text-green-300">🎉 You're next!</p>
-                      ) : (
-                        <p className="text-lg">
-                          <span className="font-bold text-yellow-300">
-                            {getQueuePosition().position - 1} order{getQueuePosition().position - 1 !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-red-100"> ahead</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="space-y-6">
+              {queueGroups.map((group) => (
+                <div key={group.storeId} className="bg-white bg-opacity-10 rounded-lg p-4 border border-white border-opacity-30">
+                  <p className="text-sm text-red-100 mb-3">Store: {group.storeName}</p>
 
-            {/* Queue Visualization */}
-            {showQueue && getPendingOrders().length > 0 && (
-              <div className="bg-white bg-opacity-10 rounded-lg p-4 overflow-x-auto">
-                <div className="flex items-center gap-2 min-w-max pb-2">
-                  {getPendingOrders().map((order, idx) => {
-                    const isUserOrder = orders.some(o => o._id === order._id);
-                    return (
-                      <div key={order._id} className="flex items-center">
-                        <div
-                          className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
-                            isUserOrder
-                              ? 'bg-green-400 text-white scale-125 ring-4 ring-yellow-300'
-                              : order.status?.toLowerCase() === 'preparing'
-                              ? 'bg-orange-400 text-white'
-                              : 'bg-yellow-300 text-gray-900'
-                          }`}
-                        >
-                          <div className="text-center">
-                            <p className="text-xs">#{order.queueNumber}</p>
-                            {isUserOrder && <p className="text-xs font-bold">YOU</p>}
-                          </div>
+                  {group.position && (
+                    <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-4 border border-white border-opacity-50">
+                      <div className="flex items-center justify-center gap-4">
+                        <div>
+                          <p className="text-4xl font-bold">{group.position}</p>
+                          <p className="text-red-100 text-sm mt-1">of {group.total}</p>
                         </div>
-                        {idx < getPendingOrders().length - 1 && (
-                          <div className="text-white text-2xl mx-2">→</div>
-                        )}
+                        <div className="text-left">
+                          {group.position === 1 ? (
+                            <p className="text-lg font-bold text-green-300">🎉 You're next in this store!</p>
+                          ) : (
+                            <p className="text-base">
+                              <span className="font-bold text-yellow-300">
+                                {group.position - 1} order{group.position - 1 !== 1 ? 's' : ''}
+                              </span>
+                              <span className="text-red-100"> ahead in this store</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {showQueue && (
+                    <div className="bg-white bg-opacity-10 rounded-lg p-4 overflow-x-auto">
+                      <div className="flex items-center gap-2 min-w-max pb-2">
+                        {group.queueOrders.map((order, idx) => {
+                          const isUserOrder = group.userOrderIds.has(String(order._id));
+                          return (
+                            <div key={order._id} className="flex items-center">
+                              <div
+                                className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
+                                  isUserOrder
+                                    ? 'bg-green-400 text-white scale-125 ring-4 ring-yellow-300'
+                                    : order.status?.toLowerCase() === 'preparing'
+                                    ? 'bg-orange-400 text-white'
+                                    : 'bg-yellow-300 text-gray-900'
+                                }`}
+                              >
+                                <div className="text-center">
+                                  <p className="text-xs">#{order.queueNumber}</p>
+                                  {isUserOrder && <p className="text-xs font-bold">YOU</p>}
+                                </div>
+                              </div>
+                              {idx < group.queueOrders.length - 1 && (
+                                <div className="text-white text-2xl mx-2">→</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-red-100 text-xs mt-3">
+                        🟡 Pending  |  🟠 Preparing  |  🟢 Your Order
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-red-100 text-xs mt-3">
-                  🟡 Pending  |  🟠 Preparing  |  🟢 Your Order
-                </p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
