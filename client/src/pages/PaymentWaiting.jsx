@@ -86,6 +86,7 @@ const PaymentWaiting = () => {
 
         const hasRejected = normalizedStatuses.some((entry) => entry === 'rejected');
         const allApproved = normalizedStatuses.length > 0 && normalizedStatuses.every((entry) => entry === 'approved');
+        const allResolved = normalizedStatuses.length > 0 && normalizedStatuses.every((entry) => entry === 'approved' || entry === 'rejected');
 
         if (allApproved) {
           setStatus('approved');
@@ -95,7 +96,7 @@ const PaymentWaiting = () => {
             alert('All store payments approved! Your orders have been placed.');
             navigate('/my-orders');
           }, 2000);
-        } else if (hasRejected) {
+        } else if (hasRejected && allResolved) {
           setStatus('rejected');
           if (intervalId) clearInterval(intervalId);
         } else {

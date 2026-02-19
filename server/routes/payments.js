@@ -89,7 +89,7 @@ const upload = multer({
 // Upload GCash proof of payment
 router.post('/gcash-upload', upload.single('file'), async (req, res) => {
   try {
-    const { customerId, items, totalAmount } = req.body;
+    const { customerId, items, totalAmount, stallId } = req.body;
 
     if (!req.file || !customerId) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -124,6 +124,12 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     }
 
     const [resolvedStallId] = stallIds;
+    const requestedStallId = String(stallId || '').trim();
+    if (requestedStallId && String(resolvedStallId) !== requestedStallId) {
+      return res.status(400).json({ message: 'Uploaded items do not match the selected store' });
+    }
+
+    const effectiveStallId = requestedStallId || String(resolvedStallId);
     const store = await User.findById(resolvedStallId).select('name');
     const storeName = store?.name || 'Store';
 
@@ -141,7 +147,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       paymentMethod: 'gcash',
       paymentStatus: 'pending', // Payment pending approval
       status: 'pending', // Order status
-      stallId: resolvedStallId,
+      stallId: effectiveStallId,
       queueNumber: queueNumber,
       estimatedTime: estimatedTime
     });

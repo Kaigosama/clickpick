@@ -117,6 +117,7 @@ const GCashPayment = () => {
         const formData = new FormData();
         formData.append('file', filesByStore[store.storeId]);
         formData.append('customerId', user._id);
+        formData.append('stallId', store.storeId);
         formData.append('amount', store.totalAmount);
         formData.append('totalAmount', store.totalAmount);
 
