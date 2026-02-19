@@ -87,12 +87,6 @@ const Checkout = () => {
       return;
     }
 
-    const storeIdsInCart = Object.keys(groupedByStore);
-    if (storeIdsInCart.length > 1) {
-      alert('Please place separate orders per store. Your cart currently has items from multiple stores.');
-      return;
-    }
-
     // If GCash is selected, redirect to payment verification
     if (paymentMethod === 'gcash') {
       if (!gcashAvailableForCart) {
@@ -101,37 +95,41 @@ const Checkout = () => {
         return;
       }
 
-      const firstCartItem = cartItems[0];
-      const selectedStallId = firstCartItem?.stallId || firstCartItem?.stall || null;
-      navigate('/gcash-payment', { state: { stallId: selectedStallId } });
+      navigate('/gcash-payment');
       return;
     }
 
     // For Cash payment, place order directly
     setLoading(true);
     try {
-      const orderData = {
-        customerId: user._id,
-        items: cartItems.map(item => ({
-          menuItemId: item._id,
-          name: item.name,
-          variation: item.selectedVariation || '',
-          riceOption: item.selectedRiceOption || '',
-          quantity: item.quantity || 1,
-          price: item.price
-        })),
-        totalAmount: cartTotal,
-        paymentMethod: paymentMethod
-      };
+      const createRequests = Object.entries(groupedByStore).map(async ([storeId, items]) => {
+        const orderData = {
+          customerId: user._id,
+          items: items.map((item) => ({
+            menuItemId: item._id,
+            name: item.name,
+            variation: item.selectedVariation || '',
+            riceOption: item.selectedRiceOption || '',
+            quantity: item.quantity || 1,
+            price: item.price
+          })),
+          totalAmount: items.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0),
+          paymentMethod: paymentMethod
+        };
 
-      const response = await api.post('/orders', orderData);
-      const newOrder = response.data;
-      
-      // Show success modal with estimated time
+        const response = await api.post('/orders', orderData);
+        return {
+          ...response.data,
+          storeId,
+          storeName: resolveStall(storeId)?.name || 'Store'
+        };
+      });
+
+      const createdOrders = await Promise.all(createRequests);
+
       setOrderSuccess({
-        queueNumber: newOrder.queueNumber,
-        estimatedTime: newOrder.estimatedTime,
-        totalAmount: newOrder.totalAmount
+        orders: createdOrders,
+        totalAmount: createdOrders.reduce((sum, order) => sum + Number(order?.totalAmount || 0), 0)
       });
       
       clearCart();
@@ -152,6 +150,10 @@ const Checkout = () => {
 
   // Success Modal
   if (orderSuccess) {
+    const successOrders = Array.isArray(orderSuccess.orders) ? orderSuccess.orders : [];
+    const firstOrder = successOrders[0];
+    const isMultiOrderSuccess = successOrders.length > 1;
+
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         {/* Header Navigation */}
@@ -176,14 +178,36 @@ const Checkout = () => {
 
           {/* Queue Number */}
           <div className="bg-gradient-to-br from-[#8B0000] to-red-700 rounded-xl p-6 mb-6 text-white">
-            <p className="text-sm font-semibold text-red-100 mb-2">QUEUE NUMBER</p>
-            <p className="text-5xl font-bold">#{orderSuccess.queueNumber}</p>
+            <p className="text-sm font-semibold text-red-100 mb-2">
+              {isMultiOrderSuccess ? 'QUEUE NUMBERS' : 'QUEUE NUMBER'}
+            </p>
+            {isMultiOrderSuccess ? (
+              <div className="space-y-1 text-left">
+                {successOrders.map((order) => (
+                  <p key={order._id} className="text-base font-semibold">
+                    {order.storeName}: #{order.queueNumber || 'N/A'}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-5xl font-bold">#{firstOrder?.queueNumber || 'N/A'}</p>
+            )}
           </div>
 
           {/* Estimated Time */}
           <div className="bg-blue-50 rounded-xl p-6 mb-6 border-2 border-blue-200">
-            <p className="text-sm font-semibold text-gray-600 mb-1">ESTIMATED TIME</p>
-            <p className="text-4xl font-bold text-blue-600">{orderSuccess.estimatedTime} min</p>
+            <p className="text-sm font-semibold text-gray-600 mb-1">
+              {isMultiOrderSuccess ? 'ESTIMATED TIMES' : 'ESTIMATED TIME'}
+            </p>
+            {isMultiOrderSuccess ? (
+              <div className="space-y-1 text-left text-blue-700 font-semibold">
+                {successOrders.map((order) => (
+                  <p key={order._id}>{order.storeName}: {order.estimatedTime || 'N/A'} min</p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-4xl font-bold text-blue-600">{firstOrder?.estimatedTime || 'N/A'} min</p>
+            )}
             <p className="text-xs text-gray-500 mt-2">*Actual time may vary based on queue</p>
           </div>
 
@@ -461,7 +485,7 @@ const Checkout = () => {
                   </select>
                   {!gcashAvailableForCart && (
                     <p className="mt-2 text-xs text-amber-700 font-semibold">
-                      GCash is unavailable
+                      GCash is unavailable for one or more selected stores
                     </p>
                   )}
                 </div>

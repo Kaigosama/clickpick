@@ -1,46 +1,56 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import api from '../services/api.js';
 
 const GCashPayment = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-  const { cartItems, cartTotal, clearCart } = useCart();
-  const [file, setFile] = useState(null);
+  const { cartItems, clearCart } = useCart();
   const [uploading, setUploading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [uploaded, setUploaded] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
-  const [gcashNumber, setGcashNumber] = useState('Not available');
+  const [stalls, setStalls] = useState([]);
+  const [filesByStore, setFilesByStore] = useState({});
+  const groupedByStore = cartItems.reduce((acc, item) => {
+    const storeId = item.stall || item.stallId || 'unknown';
+    if (!acc[storeId]) {
+      acc[storeId] = [];
+    }
+    acc[storeId].push(item);
+    return acc;
+  }, {});
+  const storesInCart = Object.entries(groupedByStore).map(([storeId, items]) => {
+    const stall = stalls.find((entry) => String(entry._id) === String(storeId));
+    return {
+      storeId,
+      storeName: stall?.name || 'Store',
+      gcashNumber: String(stall?.gcashNumber || '').trim(),
+      items,
+      totalAmount: items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0)
+    };
+  });
+  const hasMissingGcashNumber = storesInCart.some((store) => !store.gcashNumber);
+  const allProofsUploaded = storesInCart.length > 0 && storesInCart.every((store) => Boolean(filesByStore[store.storeId]));
+  const overallTotal = storesInCart.reduce((sum, store) => sum + store.totalAmount, 0);
 
   useEffect(() => {
-    const fetchGcashNumber = async () => {
+    const fetchStalls = async () => {
       try {
         const res = await api.get('/auth/stalls');
         const list = Array.isArray(res.data) ? res.data : res.data?.stalls || [];
-
-        const firstCartItem = cartItems[0];
-        const targetStallId = location.state?.stallId || firstCartItem?.stallId || firstCartItem?.stall;
-        const stall = list.find((entry) => String(entry._id) === String(targetStallId));
-
-        if (stall?.gcashNumber && String(stall.gcashNumber).trim()) {
-          setGcashNumber(String(stall.gcashNumber).trim());
-          return;
-        }
-
-        setGcashNumber('Not available');
+        setStalls(list);
       } catch (err) {
-        console.error('Error fetching stalls for GCash number:', err);
-        setGcashNumber('Not available');
+        console.error('Error fetching stalls for GCash numbers:', err);
+        setStalls([]);
       }
     };
 
-    fetchGcashNumber();
-  }, [cartItems, location.state]);
+    fetchStalls();
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -60,13 +70,17 @@ const GCashPayment = () => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+  const handleFileChange = (storeId, e) => {
+    const selectedFile = e.target.files?.[0] || null;
+    setFilesByStore((prev) => ({
+      ...prev,
+      [storeId]: selectedFile
+    }));
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      alert('Please select a photo');
+    if (!storesInCart.length) {
+      alert('Your cart is empty.');
       return;
     }
 
@@ -75,42 +89,67 @@ const GCashPayment = () => {
       return;
     }
 
+    if (hasMissingGcashNumber) {
+      alert('GCash is unavailable for one or more stores in your cart.');
+      navigate('/checkout');
+      return;
+    }
+
+    if (!allProofsUploaded) {
+      alert('Please upload proof of payment for each store.');
+      return;
+    }
+
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('customerId', user._id);
-      formData.append('amount', cartTotal);
-      formData.append('totalAmount', cartTotal);
-      
-      // Include cart items for order creation
-      const orderItems = cartItems.map(item => ({
-        menuItemId: item._id,
-        name: item.name,
-        variation: item.selectedVariation || '',
-        riceOption: item.selectedRiceOption || '',
-        quantity: item.quantity || 1,
-        price: item.price
-      }));
-      formData.append('items', JSON.stringify(orderItems));
+      const uploadResponses = [];
 
-      // Upload proof of payment
-      const response = await api.post('/payments/gcash-upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      for (const store of storesInCart) {
+        const formData = new FormData();
+        formData.append('file', filesByStore[store.storeId]);
+        formData.append('customerId', user._id);
+        formData.append('amount', store.totalAmount);
+        formData.append('totalAmount', store.totalAmount);
+
+        const orderItems = store.items.map((item) => ({
+          menuItemId: item._id,
+          name: item.name,
+          variation: item.selectedVariation || '',
+          riceOption: item.selectedRiceOption || '',
+          quantity: item.quantity || 1,
+          price: item.price
+        }));
+
+        formData.append('items', JSON.stringify(orderItems));
+
+        const response = await api.post('/payments/gcash-upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+
+        uploadResponses.push(response?.data || {});
+      }
+
+      const orderContexts = uploadResponses
+        .map((entry, index) => ({
+          orderId: entry?.orderId,
+          storeId: storesInCart[index]?.storeId,
+          storeName: storesInCart[index]?.storeName || 'Store'
+        }))
+        .filter((entry) => Boolean(entry.orderId));
+
+      const orderIds = orderContexts.map((entry) => entry.orderId);
 
       setUploaded(true);
-      clearCart(); // Clear cart since order is now created
+      clearCart();
       alert('Proof of payment uploaded successfully! Waiting for store approval...');
-      
-      // Wait for store approval (you can implement polling here)
-      // For now, navigate to waiting page
+
       navigate('/payment-waiting', {
         state: {
-          orderId: response.data?.orderId,
-          orderDbId: response.data?.orderDbId
+          orderId: orderIds[0] || '',
+          orderIds,
+          orderContexts
         }
       });
     } catch (err) {
@@ -266,7 +305,7 @@ const GCashPayment = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         {/* Header Section */}
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
           <div className="flex items-center gap-4">
@@ -286,25 +325,50 @@ const GCashPayment = () => {
           {/* Queue Number Info */}
           <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-300">
             <p className="text-sm font-semibold text-gray-900 mb-1">QUEUE NUMBER</p>
-            <p className="text-lg text-gray-600">Will be assigned after upload</p>
-          </div>
-
-          {/* GCash Number */}
-          <div className="bg-gradient-to-r from-[#8B0000] to-red-700 text-white p-6 rounded-lg shadow-lg">
-            <p className="text-sm font-semibold mb-2">Send payment to</p>
-            <p className="text-3xl font-bold tracking-wider">{gcashNumber}</p>
-            <p className="text-sm mt-3 opacity-90">Amount: ₱{cartTotal.toFixed(2)}</p>
+            <p className="text-lg text-gray-600">Assigned per store after each upload</p>
           </div>
 
           {/* Instructions */}
           <div className="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-300 space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Instructions:</h3>
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Send ₱{cartTotal.toFixed(2)} to the GCash number above</li>
-              <li>Screenshot or take a photo of the successful transaction</li>
-              <li>Upload the proof of payment below</li>
-              <li>Wait for store approval (you'll receive the status via notification)</li>
+              <li>Send payment to each store&apos;s GCash number below.</li>
+              <li>Upload one proof of payment per store.</li>
+              <li>Total checkout amount: ₱{overallTotal.toFixed(2)}</li>
+              <li>Wait for each store&apos;s approval after upload.</li>
             </ol>
+          </div>
+
+          <div className="space-y-4">
+            {storesInCart.map((store) => (
+              <div key={store.storeId} className="rounded-lg border-2 border-gray-200 p-5 bg-gray-50">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                  <p className="text-lg font-bold text-gray-900">{store.storeName}</p>
+                  <p className="text-sm font-semibold text-gray-700">Amount: ₱{store.totalAmount.toFixed(2)}</p>
+                </div>
+
+                <div className="bg-gradient-to-r from-[#8B0000] to-red-700 text-white p-4 rounded-lg mb-4">
+                  <p className="text-xs font-semibold mb-1">Send payment to</p>
+                  <p className="text-2xl font-bold tracking-wide">{store.gcashNumber || 'Not available'}</p>
+                </div>
+
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Upload proof for {store.storeName}</label>
+                <div className="border-2 border-dashed border-[#8B0000] rounded-lg p-4 text-center hover:bg-white transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(store.storeId, e)}
+                    disabled={uploading || uploaded || !store.gcashNumber}
+                    className="block mx-auto"
+                  />
+                  {filesByStore[store.storeId] && (
+                    <p className="text-sm text-green-600 font-semibold mt-2">
+                      ✓ {filesByStore[store.storeId].name}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Timer */}
@@ -330,38 +394,17 @@ const GCashPayment = () => {
             </div>
           ) : (
             <>
-              {/* File Upload */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-900">
-                  Upload Proof of Payment
-                </label>
-                <div className="border-2 border-dashed border-[#8B0000] rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    disabled={uploading || uploaded}
-                    className="block mx-auto"
-                  />
-                  {file && (
-                    <p className="text-sm text-green-600 font-semibold mt-2">
-                      ✓ {file.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-
               {/* Upload Button */}
               <button
                 onClick={handleUpload}
-                disabled={uploading || !file || uploaded}
+                disabled={uploading || uploaded || hasMissingGcashNumber || !allProofsUploaded || storesInCart.length === 0}
                 className={`w-full py-3 font-bold rounded-lg transition-colors text-lg ${
-                  uploading || !file || uploaded
+                  uploading || uploaded || hasMissingGcashNumber || !allProofsUploaded || storesInCart.length === 0
                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                     : 'bg-[#8B0000] text-white hover:bg-red-800'
                 }`}
               >
-                {uploading ? 'Uploading...' : uploaded ? 'Uploaded' : 'Upload Proof of Payment'}
+                {uploading ? 'Uploading...' : uploaded ? 'Uploaded' : `Upload Proof${storesInCart.length > 1 ? 's' : ''} of Payment`}
               </button>
             </>
           )}
