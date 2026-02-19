@@ -1141,15 +1141,15 @@ const StallMenu = () => {
                       {categoryGroups.map((group) => (
                         <div key={group.category} className="space-y-4">
                           <h2 className="text-2xl font-bold text-gray-900">{group.category}</h2>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-6">
                             {group.items.map(item => (
                               <div
                                 key={item._id}
                                 onClick={() => setEditingItem(item)}
-                                className="bg-white rounded-lg border-2 sm:border-4 border-gray-300 shadow hover:shadow-lg transition-shadow overflow-hidden flex flex-row sm:flex-col items-center sm:items-stretch cursor-pointer hover:border-[#8B0000]"
+                                className="bg-white rounded-lg border-2 sm:border-4 border-gray-300 shadow hover:shadow-lg transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000]"
                               >
-                                <div className="p-3 sm:p-6 flex-1 sm:flex-none flex flex-row sm:flex-col items-center sm:items-center gap-3 w-full">
-                                  <div className="w-16 h-16 sm:w-28 sm:h-28 bg-[#8B0000] rounded-md flex items-center justify-center text-xl sm:text-3xl text-white overflow-hidden shrink-0">
+                                <div className="p-2 sm:p-6 flex flex-col items-center gap-2 sm:gap-3 w-full">
+                                  <div className="w-full aspect-square max-w-[90px] sm:max-w-none bg-[#8B0000] rounded-md flex items-center justify-center text-lg sm:text-3xl text-white overflow-hidden">
                                     {item.image ? (
                                       <img
                                         src={resolveItemImage(item.image)}
@@ -1160,12 +1160,12 @@ const StallMenu = () => {
                                       <span>🍽️</span>
                                     )}
                                   </div>
-                                  <div className="flex-1 w-full min-w-0">
-                                    <h3 className="text-sm sm:text-lg font-semibold text-gray-900 text-left sm:text-center w-full sm:min-h-[3.5rem] sm:max-h-[3.5rem] overflow-hidden sm:flex sm:items-center sm:justify-center leading-tight break-words">
+                                    <div className="w-full min-w-0">
+                                      <h3 className="text-xs sm:text-lg font-semibold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
                                       {item.name}
                                     </h3>
-                                    <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-0">Quantity: <span className="font-bold">{item.quantity ?? 0}</span></p>
-                                    <p className={`text-[11px] sm:text-xs font-semibold mt-0.5 ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      <p className="text-[11px] sm:text-sm text-gray-600 text-center mt-0.5">Qty: <span className="font-bold">{item.quantity ?? 0}</span></p>
+                                      <p className={`text-[10px] sm:text-xs font-semibold mt-0.5 text-center ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                       {item.quantity > 0 ? 'Available' : 'Not Available'}
                                     </p>
                                     <button
@@ -1173,7 +1173,7 @@ const StallMenu = () => {
                                         e.stopPropagation(); 
                                         setEditingItem(item);
                                       }}
-                                      className="mt-2 sm:mt-3 px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-400 rounded text-xs sm:text-sm font-semibold hover:bg-gray-100 w-full"
+                                        className="mt-2 sm:mt-3 px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-400 rounded text-[11px] sm:text-sm font-semibold hover:bg-gray-100 w-full"
                                     >
                                       Edit Item
                                     </button>
@@ -1197,7 +1197,7 @@ const StallMenu = () => {
                     categoryGroups.map((group) => (
                       <div key={group.category} className="space-y-4">
                         <h2 className="text-2xl font-bold text-gray-900">{group.category}</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-6">
                           {group.items.map(item => {
                             const availableQty = item.quantity ?? 0;
                             const quantity = itemQuantities[item._id] || 0;
@@ -1216,9 +1216,9 @@ const StallMenu = () => {
                               <div 
                                 key={item._id}
                                 onClick={() => setSelectedProduct(item)}
-                                className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-row sm:flex-col self-start cursor-pointer hover:border-[#8B0000]"
+                                className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col self-start cursor-pointer hover:border-[#8B0000]"
                               >
-                                <div className="bg-[#8B0000] w-24 h-24 sm:w-full sm:aspect-square sm:h-auto flex items-center justify-center text-3xl sm:text-5xl sm:border-b-2 border-gray-300 overflow-hidden shrink-0">
+                                <div className="bg-[#8B0000] w-full aspect-square flex items-center justify-center text-2xl sm:text-5xl border-b-2 border-gray-300 overflow-hidden">
                                   {item.image ? (
                                     <img
                                       src={resolveItemImage(item.image)}
@@ -1230,25 +1230,25 @@ const StallMenu = () => {
                                   )}
                                 </div>
                                 
-                                <div className="p-3 sm:p-4 flex flex-col flex-1 min-w-0">
-                                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 text-left sm:text-center w-full sm:min-h-[3.5rem] sm:max-h-[3.5rem] overflow-hidden sm:flex sm:items-center sm:justify-center leading-tight break-words">
+                                <div className="p-2 sm:p-4 flex flex-col flex-1 min-w-0">
+                                  <h3 className="text-xs sm:text-lg font-bold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
                                     {item.name}
                                   </h3>
-                                  <p className={`text-[11px] sm:text-xs italic text-gray-600 text-left sm:text-center mt-1 sm:min-h-[2.5rem] line-clamp-2 ${variationNames ? '' : 'opacity-0'}`}>
+                                  <p className={`text-[10px] sm:text-xs italic text-gray-600 text-center mt-1 min-h-[2rem] sm:min-h-[2.5rem] line-clamp-2 ${variationNames ? '' : 'opacity-0'}`}>
                                     {variationNames || 'No variation'}
                                   </p>
-                                  <p className="text-lg sm:text-2xl font-bold text-gray-900 my-1 sm:my-2">₱{item.price}</p>
+                                  <p className="text-base sm:text-2xl font-bold text-gray-900 my-1 sm:my-2">₱{item.price}</p>
                                   
-                                  <p className={`text-[11px] sm:text-xs mb-2 sm:mb-3 ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                                  <p className={`text-[10px] sm:text-xs mb-2 sm:mb-3 text-center ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
                                     {isAvailable ? `Available: ${availableQty}` : 'Not Available'}
                                   </p>
 
                                   {!requiresRiceChoice && !requiresVariationChoice && (
                                     <div 
                                       onClick={(e) => e.stopPropagation()}
-                                      className="border border-gray-400 sm:border-2 rounded px-2 sm:px-3 py-1.5 sm:py-2 mb-2 sm:mb-3"
+                                      className="border border-gray-400 sm:border-2 rounded px-2 sm:px-3 py-1 sm:py-2 mb-2 sm:mb-3"
                                     >
-                                      <p className="text-center text-xs sm:text-sm font-semibold text-gray-700">{quantity}</p>
+                                      <p className="text-center text-[11px] sm:text-sm font-semibold text-gray-700">{quantity}</p>
                                       <div className="flex items-center justify-between gap-2 mt-1">
                                         <button
                                           onClick={(e) => {
@@ -1258,11 +1258,11 @@ const StallMenu = () => {
                                               [item._id]: Math.max(0, quantity - 1)
                                             }));
                                           }}
-                                          className="text-base sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                          className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
                                         >
                                           −
                                         </button>
-                                        <span className="text-[11px] sm:text-xs font-semibold text-gray-600">Qty</span>
+                                        <span className="text-[10px] sm:text-xs font-semibold text-gray-600">Qty</span>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1271,7 +1271,7 @@ const StallMenu = () => {
                                               [item._id]: Math.min(availableQty, quantity + 1)
                                             }));
                                           }}
-                                          className="text-base sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                          className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
                                         >
                                           +
                                         </button>
@@ -1280,7 +1280,7 @@ const StallMenu = () => {
                                   )}
 
                                   {requiresRiceChoice && (
-                                    <p className="text-[11px] sm:text-xs text-gray-600 mb-2 sm:mb-3 sm:min-h-[1.25rem]">Select rice option before adding.</p>
+                                    <p className="text-[10px] sm:text-xs text-gray-600 mb-2 sm:mb-3 min-h-[1rem] sm:min-h-[1.25rem]">Select rice option before adding.</p>
                                   )}
 
                                   <button 
@@ -1303,7 +1303,7 @@ const StallMenu = () => {
                                         [item._id]: 0
                                       }));
                                     }}
-                                    className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-xs sm:text-sm ${
+                                    className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-[11px] sm:text-sm ${
                                       !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                         : 'bg-[#8B0000] text-white hover:bg-red-800'
