@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx'; // Import the Context
 import api from '../services/api'; // Import our centralized API service
@@ -15,19 +15,7 @@ const Auth = () => {
   const [phone, setPhone] = useState('');
   
   const navigate = useNavigate();
-  const { login, user } = useContext(AuthContext); // Get the login function and user from global state
-
-  // Redirect already logged-in users to their appropriate dashboard
-  useEffect(() => {
-    if (user) {
-      if (user.role === 'stall_staff') {
-          const stallId = user.stallId || user._id || '1';
-        navigate(`/stall/${stallId}`);
-      } else if (user.role === 'customer') {
-        navigate('/menu');
-      }
-    }
-  }, [user, navigate]);
+  const { login } = useContext(AuthContext); // Get the login function from global state
 
   const handleSubmit = async (e) => {
     e.preventDefault();
