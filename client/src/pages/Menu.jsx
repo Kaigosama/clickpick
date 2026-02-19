@@ -53,9 +53,23 @@ const Menu = () => {
     navigate('/');
   };
 
+  const resolveStoreId = (item) => {
+    const rawStoreId = item?.stallId ?? item?.stall;
+    if (rawStoreId && typeof rawStoreId === 'object') {
+      return String(rawStoreId._id || rawStoreId.id || rawStoreId.stallId || '');
+    }
+    return String(rawStoreId || '');
+  };
+
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       alert("Cart is empty!");
+      return;
+    }
+
+    const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
+    if (storeIdsInCart.length > 1) {
+      alert('Please place separate orders per store. Your cart currently has items from multiple stores.');
       return;
     }
 

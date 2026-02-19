@@ -32,6 +32,7 @@ const Cart = () => {
     acc[storeId].push(item);
     return acc;
   }, {});
+  const hasMultipleStores = Object.keys(groupedByStore).length > 1;
 
   useEffect(() => {
     const fetchStalls = async () => {
@@ -67,6 +68,12 @@ const Cart = () => {
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       alert("Cart is empty!");
+      return;
+    }
+
+    const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
+    if (storeIdsInCart.length > 1) {
+      alert('Please place separate orders per store. Your basket currently has items from multiple stores.');
       return;
     }
 
@@ -111,6 +118,14 @@ const Cart = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleProceedToCheckout = () => {
+    if (hasMultipleStores) {
+      alert('Please place separate orders per store. Your basket currently has items from multiple stores.');
+      return;
+    }
+    navigate('/checkout');
   };
 
   if (!user) return null;
@@ -375,8 +390,16 @@ const Cart = () => {
                 </div>
 
                 {/* Checkout Button */}
+                {hasMultipleStores && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Please place separate orders per store before checkout.
+                    </p>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => navigate('/checkout')}
+                  onClick={handleProceedToCheckout}
                   disabled={cartItems.length === 0}
                   className={`w-full py-3 font-bold rounded-lg transition-colors ${
                     cartItems.length === 0
