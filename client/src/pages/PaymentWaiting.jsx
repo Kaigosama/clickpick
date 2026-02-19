@@ -7,178 +7,57 @@ const PaymentWaiting = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-  const [orderIds] = useState(() => {
-    if (Array.isArray(location.state?.orderIds) && location.state.orderIds.length > 0) {
-      return location.state.orderIds.filter(Boolean);
-    }
-    if (location.state?.orderId) {
-      return [location.state.orderId];
-    }
-    return [];
-  });
-  const [orderContextMap] = useState(() => {
-    const entries = Array.isArray(location.state?.orderContexts) ? location.state.orderContexts : [];
-    return entries.reduce((acc, entry, index) => {
-      if (!entry?.orderId) return acc;
-      acc[entry.orderId] = {
-        storeName: entry.storeName || `Store ${index + 1}`,
-        storeId: entry.storeId || ''
-      };
-      return acc;
-    }, {});
-  });
-  const [queueNumbers, setQueueNumbers] = useState({});
-  const [orderStatuses, setOrderStatuses] = useState({});
+  const [orderId] = useState(location.state?.orderId || '');
+  const [queueNumber, setQueueNumber] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
-  const [status, setStatus] = useState('waiting'); // waiting, approved, rejected
+  const [status, setStatus] = useState('waiting');
 
   useEffect(() => {
     let intervalId;
 
-    // Poll for approval status
     const pollStatus = async () => {
       try {
-        if (!orderIds.length) {
-          return;
+        if (!orderId) return;
+
+        const response = await api.get(`/payments/gcash-status/${orderId}`);
+        const remoteStatus = String(response?.data?.status || '').toLowerCase();
+        const remoteQueueNumber = response?.data?.queueNumber;
+
+        if (remoteQueueNumber) {
+          setQueueNumber(remoteQueueNumber);
         }
 
-        const responses = await Promise.all(
-          orderIds.map(async (orderId) => {
-            try {
-              const response = await api.get(`/payments/gcash-status/${orderId}`);
-              return { orderId, data: response?.data || null };
-            } catch (error) {
-              return { orderId, data: null };
-            }
-          })
-        );
-
-        setQueueNumbers((prev) => {
-          const next = { ...prev };
-          responses.forEach(({ orderId, data }) => {
-            if (data?.queueNumber) {
-              next[orderId] = data.queueNumber;
-            }
-          });
-          return next;
-        });
-
-        setOrderStatuses((prev) => {
-          const next = { ...prev };
-          responses.forEach(({ orderId, data }) => {
-            const remoteStatus = String(data?.status || '').toLowerCase();
-            if (remoteStatus === 'approved' || remoteStatus === 'rejected') {
-              next[orderId] = remoteStatus;
-            } else {
-              next[orderId] = 'waiting';
-            }
-          });
-          return next;
-        });
-
-        const normalizedStatuses = responses.map(({ data }) => {
-          const remoteStatus = String(data?.status || '').toLowerCase();
-          if (remoteStatus === 'approved') return 'approved';
-          if (remoteStatus === 'rejected') return 'rejected';
-          return 'waiting';
-        });
-
-        const hasRejected = normalizedStatuses.some((entry) => entry === 'rejected');
-        const allApproved = normalizedStatuses.length > 0 && normalizedStatuses.every((entry) => entry === 'approved');
-        const allResolved = normalizedStatuses.length > 0 && normalizedStatuses.every((entry) => entry === 'approved' || entry === 'rejected');
-
-        if (allApproved) {
+        if (remoteStatus === 'approved') {
           setStatus('approved');
           if (intervalId) clearInterval(intervalId);
 
           setTimeout(() => {
-            alert('All store payments approved! Your orders have been placed.');
+            alert('Payment approved! Your order has been placed.');
             navigate('/my-orders');
           }, 2000);
-        } else if (hasRejected && allResolved) {
+        } else if (remoteStatus === 'rejected') {
           setStatus('rejected');
           if (intervalId) clearInterval(intervalId);
         } else {
           setStatus('waiting');
         }
-
       } catch (err) {
         console.error('Polling error:', err);
       }
     };
 
-    // Poll immediately, then every 3 seconds
     pollStatus();
     intervalId = setInterval(pollStatus, 3000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [orderIds, navigate]);
+  }, [orderId, navigate]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
-  };
-
-  const queueEntries = orderIds.map((orderId, index) => ({
-    orderId,
-    queueNumber: queueNumbers[orderId],
-    label: orderContextMap[orderId]?.storeName || (orderIds.length > 1 ? `Store ${index + 1}` : 'Queue'),
-    status: orderStatuses[orderId] || 'waiting'
-  }));
-
-  const renderQueueDisplay = (textColorClass) => {
-    if (!queueEntries.length) {
-      return <span className={`font-bold ${textColorClass}`}>Pending...</span>;
-    }
-
-    if (queueEntries.length === 1) {
-      return <span className={`font-bold ${textColorClass}`}>{queueEntries[0].queueNumber || 'Pending...'}</span>;
-    }
-
-    return (
-      <span className="inline-flex flex-col items-start gap-1 align-middle">
-        {queueEntries.map((entry) => (
-          <span key={entry.orderId} className={`font-bold ${textColorClass}`}>
-            {entry.label}: {entry.queueNumber || 'Pending...'}
-          </span>
-        ))}
-      </span>
-    );
-  };
-
-  const getStatusBadgeClass = (entryStatus) => {
-    if (entryStatus === 'approved') return 'bg-green-100 text-green-700';
-    if (entryStatus === 'rejected') return 'bg-red-100 text-red-700';
-    return 'bg-blue-100 text-blue-700';
-  };
-
-  const getStatusLabel = (entryStatus) => {
-    if (entryStatus === 'approved') return 'Approved';
-    if (entryStatus === 'rejected') return 'Rejected';
-    return 'Waiting';
-  };
-
-  const renderPerStoreStatusCards = () => {
-    if (!queueEntries.length) return null;
-
-    return (
-      <div className="mt-5 space-y-2 text-left max-w-md mx-auto">
-        {queueEntries.map((entry) => (
-          <div key={entry.orderId} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{entry.label}</p>
-              <p className="text-xs text-gray-600">Queue #{entry.queueNumber || 'Pending...'}</p>
-            </div>
-            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClass(entry.status)}`}>
-              {getStatusLabel(entry.status)}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
   };
 
   if (!user) return null;
@@ -194,24 +73,21 @@ const PaymentWaiting = () => {
         />
       )}
 
-      {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
-          {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
             <span className="text-xl font-bold">ClickPick</span>
           </div>
 
-          {/* Navigation Links */}
           <nav className="hidden sm:flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
-            <button 
+            <button
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
             >
               STORES
             </button>
-            <button 
+            <button
               onClick={() => navigate('/my-orders')}
               className="hover:opacity-80 font-semibold text-lg"
             >
@@ -219,13 +95,10 @@ const PaymentWaiting = () => {
             </button>
           </nav>
 
-          {/* User Profile */}
           <div className="flex items-center gap-3 sm:gap-6">
             <div className="sm:hidden relative">
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
-                  {user?.name || 'User'}
-                </p>
+                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">{user?.name || 'User'}</p>
                 <button
                   onClick={() => {
                     setShowMobileNavMenu(!showMobileNavMenu);
@@ -281,7 +154,7 @@ const PaymentWaiting = () => {
             </div>
 
             <div className="relative hidden sm:block">
-              <button 
+              <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
               >
@@ -292,7 +165,6 @@ const PaymentWaiting = () => {
                 </div>
               </button>
 
-              {/* Dropdown Menu */}
               {showProfileMenu && (
                 <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48">
                   <button
@@ -320,19 +192,17 @@ const PaymentWaiting = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16 min-h-[calc(100vh-100px)] flex items-center justify-center">
         {status === 'waiting' && (
           <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-12 text-center border-4 border-blue-300 w-full">
             <div className="text-6xl mb-6 animate-bounce">⏳</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Under Review</h1>
             <p className="text-gray-600 text-lg mb-4">
-              Queue Status: {renderQueueDisplay('text-blue-600')}
+              Queue #: <span className="font-bold text-blue-600">{queueNumber || 'Pending...'}</span>
             </p>
             <p className="text-gray-600 mb-8">
               Your proof of payment has been received. The store is reviewing your payment. This usually takes a few minutes.
             </p>
-            {renderPerStoreStatusCards()}
             <div className="flex justify-center gap-2 mb-8">
               <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
               <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
@@ -347,12 +217,11 @@ const PaymentWaiting = () => {
             <div className="text-6xl mb-6">✓</div>
             <h1 className="text-3xl font-bold text-green-600 mb-3">Payment Approved!</h1>
             <p className="text-gray-600 text-lg mb-4">
-              Queue Status: {renderQueueDisplay('text-green-600')}
+              Queue #: <span className="font-bold text-green-600">{queueNumber || 'Assigned'}</span>
             </p>
             <p className="text-gray-600 mb-8">
               Your payment has been verified. Your order is now being prepared.
             </p>
-            {renderPerStoreStatusCards()}
             <button
               onClick={() => navigate('/my-orders')}
               className="px-8 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors text-lg"
@@ -367,12 +236,11 @@ const PaymentWaiting = () => {
             <div className="text-6xl mb-6">✕</div>
             <h1 className="text-3xl font-bold text-red-600 mb-3">Payment Rejected</h1>
             <p className="text-gray-600 text-lg mb-4">
-              Queue Status: {renderQueueDisplay('text-red-600')}
+              Queue #: <span className="font-bold text-red-600">{queueNumber || 'N/A'}</span>
             </p>
             <p className="text-gray-600 mb-8">
-              One or more store payments could not be verified. Please contact the store or try again.
+              Your payment could not be verified. Please contact the store or try again.
             </p>
-            {renderPerStoreStatusCards()}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => navigate('/checkout')}
