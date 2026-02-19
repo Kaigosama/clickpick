@@ -46,7 +46,7 @@ const processExpiredReadyOrders = async () => {
       const storeName = order.stallId?.name || 'Store';
       await sendStatusSMS(
         customerPhone,
-        order.queueNumber,
+        order.orderNumber || order.queueNumber,
         needsRefund ? 'refund_pending' : 'cancelled',
         storeName
       );

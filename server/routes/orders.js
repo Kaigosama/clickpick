@@ -36,13 +36,14 @@ const uploadRefundProof = multer({
   }
 });
 
-const calculateEstimatedTime = async (items) => {
+const calculateEstimatedTime = async (items, stallId) => {
   const baseTimePerItem = 3;
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   let prepTime = totalItems * baseTimePerItem;
 
   const activeOrders = await Order.countDocuments({
-    status: { $in: ['pending', 'preparing'] }
+    status: { $in: ['pending', 'preparing'] },
+    ...(stallId ? { stallId } : {})
   });
 
   const queueDelay = Math.max(0, activeOrders) * 2;
@@ -50,6 +51,18 @@ const calculateEstimatedTime = async (items) => {
   const totalTime = prepTime + queueDelay + complexityBuffer;
 
   return Math.max(5, Math.min(60, Math.round(totalTime)));
+};
+
+const getNextOrderIdentifiers = async (stallId) => {
+  const [orderCount, storeQueueCount] = await Promise.all([
+    Order.countDocuments(),
+    Order.countDocuments({ stallId })
+  ]);
+
+  return {
+    orderNumber: orderCount + 1,
+    queueNumber: storeQueueCount + 1
+  };
 };
 
 const getGracePeriodExpiry = (readyAt = new Date()) => {
@@ -256,10 +269,6 @@ router.get('/:userId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const count = await Order.countDocuments();
-    const queueNumber = count + 1;
-    const estimatedTime = await calculateEstimatedTime(req.body.items);
-
     const menuItemIds = (req.body.items || [])
       .map((item) => item?.menuItemId)
       .filter(Boolean);
@@ -288,6 +297,8 @@ router.post('/', async (req, res) => {
     const [resolvedStallId] = stallIds;
     const store = await User.findById(resolvedStallId).select('name');
     const storeName = store?.name || 'Store';
+    const { orderNumber, queueNumber } = await getNextOrderIdentifiers(resolvedStallId);
+    const estimatedTime = await calculateEstimatedTime(req.body.items, resolvedStallId);
 
     const newOrder = new Order({
       customerId: req.body.customerId,
@@ -295,6 +306,7 @@ router.post('/', async (req, res) => {
       totalAmount: req.body.totalAmount,
       paymentMethod: req.body.paymentMethod,
       stallId: resolvedStallId,
+      orderNumber,
       queueNumber,
       estimatedTime,
       status: 'pending'
@@ -304,7 +316,7 @@ router.post('/', async (req, res) => {
 
     const customer = await User.findById(savedOrder.customerId);
     if (customer?.phone) {
-      await sendStatusSMS(customer.phone, savedOrder.queueNumber, 'pending', storeName);
+      await sendStatusSMS(customer.phone, savedOrder.orderNumber || savedOrder.queueNumber, 'pending', storeName);
     }
 
     res.status(201).json(savedOrder);
@@ -371,12 +383,12 @@ router.put('/:id', async (req, res) => {
 
     if (req.body.status) {
       const phone = updatedOrder.customerId?.phone;
-      const queueNo = updatedOrder.queueNumber;
+      const orderNo = updatedOrder.orderNumber || updatedOrder.queueNumber;
       const store = await User.findById(updatedOrder.stallId).select('name');
       const storeName = store?.name || 'Store';
 
       if (phone) {
-        await sendStatusSMS(phone, queueNo, req.body.status, storeName);
+        await sendStatusSMS(phone, orderNo, req.body.status, storeName);
       }
     }
 
@@ -430,7 +442,7 @@ router.post('/:id/refund-proof', uploadRefundProof.single('refundProof'), async 
     if (customerPhone) {
       const store = await User.findById(order.stallId).select('name');
       const storeName = store?.name || 'Store';
-      await sendStatusSMS(customerPhone, order.queueNumber, 'refund_sent', storeName);
+      await sendStatusSMS(customerPhone, order.orderNumber || order.queueNumber, 'refund_sent', storeName);
     }
 
     res.status(200).json({

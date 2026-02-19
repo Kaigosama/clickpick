@@ -8,6 +8,7 @@ const PaymentWaiting = () => {
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
   const [orderId] = useState(location.state?.orderId || '');
+  const [orderNumber, setOrderNumber] = useState(null);
   const [queueNumber, setQueueNumber] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
@@ -22,7 +23,12 @@ const PaymentWaiting = () => {
 
         const response = await api.get(`/payments/gcash-status/${orderId}`);
         const remoteStatus = String(response?.data?.status || '').toLowerCase();
+        const remoteOrderNumber = response?.data?.orderNumber;
         const remoteQueueNumber = response?.data?.queueNumber;
+
+        if (remoteOrderNumber) {
+          setOrderNumber(remoteOrderNumber);
+        }
 
         if (remoteQueueNumber) {
           setQueueNumber(remoteQueueNumber);
@@ -198,6 +204,9 @@ const PaymentWaiting = () => {
             <div className="text-6xl mb-6 animate-bounce">⏳</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Under Review</h1>
             <p className="text-gray-600 text-lg mb-4">
+              Order #: <span className="font-bold text-blue-600">{orderNumber || 'Pending...'}</span>
+            </p>
+            <p className="text-gray-600 text-lg mb-4">
               Queue #: <span className="font-bold text-blue-600">{queueNumber || 'Pending...'}</span>
             </p>
             <p className="text-gray-600 mb-8">
@@ -217,6 +226,9 @@ const PaymentWaiting = () => {
             <div className="text-6xl mb-6">✓</div>
             <h1 className="text-3xl font-bold text-green-600 mb-3">Payment Approved!</h1>
             <p className="text-gray-600 text-lg mb-4">
+              Order #: <span className="font-bold text-green-600">{orderNumber || 'Assigned'}</span>
+            </p>
+            <p className="text-gray-600 text-lg mb-4">
               Queue #: <span className="font-bold text-green-600">{queueNumber || 'Assigned'}</span>
             </p>
             <p className="text-gray-600 mb-8">
@@ -235,6 +247,9 @@ const PaymentWaiting = () => {
           <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-12 text-center border-4 border-red-500 w-full">
             <div className="text-6xl mb-6">✕</div>
             <h1 className="text-3xl font-bold text-red-600 mb-3">Payment Rejected</h1>
+            <p className="text-gray-600 text-lg mb-4">
+              Order #: <span className="font-bold text-red-600">{orderNumber || 'N/A'}</span>
+            </p>
             <p className="text-gray-600 text-lg mb-4">
               Queue #: <span className="font-bold text-red-600">{queueNumber || 'N/A'}</span>
             </p>

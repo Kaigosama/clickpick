@@ -28,7 +28,7 @@ const getRequesterFromToken = async (req) => {
 };
 
 // Function to calculate estimated preparation time
-const calculateEstimatedTime = async (items, queuePosition) => {
+const calculateEstimatedTime = async (items, stallId) => {
   // Base time per item: 3 minutes
   const baseTimePerItem = 3;
   
@@ -40,7 +40,8 @@ const calculateEstimatedTime = async (items, queuePosition) => {
   
   // Get current workload (active orders)
   const activeOrders = await Order.countDocuments({
-    status: { $in: ['pending', 'preparing'] }
+    status: { $in: ['pending', 'preparing'] },
+    ...(stallId ? { stallId } : {})
   });
   
   // Add queue delay: 2 minutes per order ahead in queue
@@ -54,6 +55,18 @@ const calculateEstimatedTime = async (items, queuePosition) => {
   
   // Return estimated time (minimum 5 minutes, maximum 60 minutes)
   return Math.max(5, Math.min(60, Math.round(totalTime)));
+};
+
+const getNextOrderIdentifiers = async (stallId) => {
+  const [orderCount, storeQueueCount] = await Promise.all([
+    Order.countDocuments(),
+    Order.countDocuments({ stallId })
+  ]);
+
+  return {
+    orderNumber: orderCount + 1,
+    queueNumber: storeQueueCount + 1
+  };
 };
 
 // Create uploads directory if it doesn't exist
@@ -133,12 +146,8 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     const store = await User.findById(resolvedStallId).select('name');
     const storeName = store?.name || 'Store';
 
-    // Create the order first with payment pending
-    const count = await Order.countDocuments();
-    const queueNumber = count + 1;
-    
-    // Calculate estimated preparation time
-    const estimatedTime = await calculateEstimatedTime(parsedItems, queueNumber);
+    const { orderNumber, queueNumber } = await getNextOrderIdentifiers(effectiveStallId);
+    const estimatedTime = await calculateEstimatedTime(parsedItems, effectiveStallId);
 
     const newOrder = new Order({
       customerId: customerId,
@@ -148,8 +157,9 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       paymentStatus: 'pending', // Payment pending approval
       status: 'pending', // Order status
       stallId: effectiveStallId,
-      queueNumber: queueNumber,
-      estimatedTime: estimatedTime
+      orderNumber,
+      queueNumber,
+      estimatedTime
     });
 
     const savedOrder = await newOrder.save();
@@ -158,7 +168,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     if (savedOrder?.customerId) {
       const customer = await User.findById(savedOrder.customerId);
       if (customer?.phone) {
-        await sendStatusSMS(customer.phone, savedOrder.queueNumber, 'pending', storeName);
+        await sendStatusSMS(customer.phone, savedOrder.orderNumber || savedOrder.queueNumber, 'pending', storeName);
       } else {
         console.log("⚠️ SMS skipped: Customer has no phone number saved.");
       }
@@ -225,7 +235,7 @@ router.get('/gcash-status/:orderId', async (req, res) => {
     const { orderId } = req.params;
 
     const payment = await Payment.findOne({ orderId: orderId })
-      .populate('orderDbId', 'queueNumber _id');
+      .populate('orderDbId', 'orderNumber queueNumber _id');
 
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
@@ -234,6 +244,7 @@ router.get('/gcash-status/:orderId', async (req, res) => {
     res.json({
       status: payment.status,
       orderId: orderId,
+      orderNumber: payment.orderDbId?.orderNumber,
       queueNumber: payment.orderDbId?.queueNumber,
       approvedAt: payment.approvedAt,
       rejectionReason: payment.rejectionReason
@@ -294,7 +305,7 @@ router.post('/gcash-approve/:paymentId', async (req, res) => {
         if (customer?.phone) {
           const store = await User.findById(updatedOrder.stallId).select('name');
           const storeName = store?.name || 'Store';
-          await sendStatusSMS(customer.phone, updatedOrder.queueNumber, 'approved', storeName);
+          await sendStatusSMS(customer.phone, updatedOrder.orderNumber || updatedOrder.queueNumber, 'approved', storeName);
         }
       }
     }
@@ -379,7 +390,7 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
         if (customer?.phone) {
           const store = await User.findById(order.stallId).select('name');
           const storeName = store?.name || 'Store';
-          await sendStatusSMS(customer.phone, order.queueNumber, 'rejected', storeName);
+          await sendStatusSMS(customer.phone, order.orderNumber || order.queueNumber, 'rejected', storeName);
         }
       }
     }
@@ -408,7 +419,7 @@ router.get('/pending-payments', async (req, res) => {
     .populate('customerId', 'name email phone')
     .populate({
       path: 'orderDbId',
-      select: 'queueNumber _id stallId',
+      select: 'orderNumber queueNumber _id stallId',
       ...(effectiveStallId ? { match: { stallId: effectiveStallId } } : {})
     })
     .sort({ createdAt: -1 });

@@ -37,6 +37,7 @@ const OrderSchema = new mongoose.Schema({
     enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'], 
     default: 'pending' 
   },
+  orderNumber: { type: Number },
   queueNumber: { type: Number },
   estimatedTime: { type: Number }, // Estimated preparation time in minutes
   stallId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

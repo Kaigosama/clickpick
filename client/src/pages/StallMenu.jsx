@@ -243,7 +243,7 @@ const StallMenu = () => {
       const placedAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A';
       const completedAt = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A';
       const items = order.items?.map((item) => `${item.quantity || 1}x ${item.name}`).join(', ') || 'N/A';
-      const orderId = order.queueNumber || order._id;
+      const orderId = order.orderNumber || order.queueNumber || order._id;
       const payment = order.paymentMethod?.toUpperCase() || 'CASH';
 
       return {
@@ -1118,7 +1118,8 @@ const StallMenu = () => {
                         <div key={order._id} className="bg-yellow-400 bg-opacity-15 border-2 border-yellow-400 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <span className="text-lg font-bold">Queue #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">Order #{order.orderNumber || order._id}</p>
                               <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
                             </div>
                             <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">PENDING</span>
@@ -1150,7 +1151,8 @@ const StallMenu = () => {
                         <div key={order._id} className="bg-orange-400 bg-opacity-15 border-2 border-orange-400 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <span className="text-lg font-bold">Queue #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">Order #{order.orderNumber || order._id}</p>
                               <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
                             </div>
                             <span className="bg-orange-400 text-white px-2 py-1 rounded text-xs font-bold">PREPARING</span>
@@ -1185,7 +1187,8 @@ const StallMenu = () => {
                         <div key={order._id} className="bg-green-400 bg-opacity-15 border-2 border-green-400 rounded-lg p-4">
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
+                              <span className="text-lg font-bold">Queue #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">Order #{order.orderNumber || order._id}</p>
                               <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
                             </div>
                             <span className="bg-green-400 text-white px-2 py-1 rounded text-xs font-bold">READY</span>
@@ -1267,7 +1270,7 @@ const StallMenu = () => {
                           {order.historyType === 'completed' ? 'COMPLETED' : 'CANCELLED'}
                         </span>
                       </div>
-                      <div className="font-semibold">#{order.queueNumber || order._id}</div>
+                      <div className="font-semibold">#{order.orderNumber || order.queueNumber || order._id}</div>
                       <div className="col-span-2">{order.items?.map((item) => `${item.quantity}x ${item.name}`).join(', ') || 'N/A'}</div>
                       <div>
                         {order.historyType === 'cancelled'
@@ -1318,7 +1321,7 @@ const StallMenu = () => {
                     <div key={order._id} className="grid grid-cols-5 gap-2 border-t border-gray-200 px-4 py-3 text-sm text-gray-700">
                       <div>{order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
                       <div>{order.items?.map(i => i.name).join(', ') || 'N/A'}</div>
-                      <div>{order.queueNumber || order._id}</div>
+                      <div>{order.orderNumber || order.queueNumber || order._id}</div>
                       <div>{order.paymentMethod?.toUpperCase() || 'CASH'}</div>
                       <div>{order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A'}</div>
                     </div>
