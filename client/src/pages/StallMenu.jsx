@@ -943,6 +943,9 @@ const StallMenu = () => {
                       </div>
 
                       <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                        <p className="text-xs mb-1 text-gray-500">
+                          <strong>Payment Ref:</strong> {payment._id}
+                        </p>
                         <p className="text-sm mb-1">
                           <strong>Customer:</strong> {payment.customerId?.name || 'N/A'}
                         </p>
@@ -960,7 +963,7 @@ const StallMenu = () => {
                         {payment.proofOfPaymentUrl ? (
                           <div className="relative">
                             {(() => {
-                              const proofImageUrl = toServerAssetUrl(payment.proofOfPaymentUrl);
+                              const proofImageUrl = `${toServerAssetUrl(payment.proofOfPaymentUrl)}?payment=${payment._id}&t=${new Date(payment.createdAt || Date.now()).getTime()}`;
                               return (
                                 <>
                             <img 

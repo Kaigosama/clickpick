@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const SequenceCounter = require('../models/SequenceCounter');
@@ -89,8 +90,8 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'gcash-' + uniqueSuffix + path.extname(file.originalname));
+    const uniqueSuffix = `${Date.now()}-${crypto.randomUUID()}`;
+    cb(null, `gcash-${uniqueSuffix}${path.extname(file.originalname)}`);
   }
 });
 

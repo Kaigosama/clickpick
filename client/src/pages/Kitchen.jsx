@@ -219,16 +219,6 @@ const Kitchen = () => {
         <button onClick={logout} style={{background: 'red', color: 'white', padding: '10px'}}>Logout</button>
       </div>
 
-      {/* DEBUG SECTION - ALWAYS VISIBLE */}
-      <div style={{ background: '#333', padding: '20px', borderRadius: '15px', color: 'white', marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 15px 0' }}>🔍 Debug Info</h3>
-        <p><strong>Pending Payments Count:</strong> {pendingPayments.length}</p>
-        <p><strong>Pending Payments Array:</strong></p>
-        <pre style={{ background: '#000', padding: '10px', borderRadius: '8px', overflow: 'auto', maxHeight: '200px' }}>
-          {JSON.stringify(pendingPayments, null, 2)}
-        </pre>
-      </div>
-
       {/* PENDING GCASH PAYMENTS SECTION */}
       {pendingPayments.length > 0 && (
         <div style={{ background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)', padding: '25px', borderRadius: '15px', border: '3px solid #e65100', color: 'white' }}>
@@ -239,19 +229,6 @@ const Kitchen = () => {
             </span>
           </h2>
 
-          {/* Debug Info */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', marginBottom: '20px', borderRadius: '8px', fontSize: '0.85em' }}>
-            <p><strong>Debug Info:</strong></p>
-            <p>Total pending payments: {pendingPayments.length}</p>
-            {pendingPayments[0] && (
-              <>
-                <p>Sample payment ID: {pendingPayments[0]._id}</p>
-                <p>Sample proofOfPaymentUrl: {pendingPayments[0].proofOfPaymentUrl || 'MISSING'}</p>
-                <p>Sample proofOfPaymentPath: {pendingPayments[0].proofOfPaymentPath || 'MISSING'}</p>
-              </>
-            )}
-          </div>
-          
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
             {pendingPayments.map(payment => (
               <div key={payment._id} style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '20px', borderRadius: '12px', color: '#333', border: '2px solid #ff9800' }}>
@@ -266,6 +243,9 @@ const Kitchen = () => {
                 </div>
 
                 <div style={{ marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '0.8em', color: '#666' }}>
+                    <strong>Payment Ref:</strong> {payment._id}
+                  </p>
                   <p style={{ margin: '0 0 5px 0', fontSize: '0.9em' }}>
                     <strong>Customer:</strong> {payment.customerId?.name || 'N/A'}
                   </p>
@@ -283,7 +263,7 @@ const Kitchen = () => {
                   {payment.proofOfPaymentUrl ? (
                     <div style={{ position: 'relative' }}>
                       {(() => {
-                        const proofImageUrl = toServerAssetUrl(payment.proofOfPaymentUrl);
+                        const proofImageUrl = `${toServerAssetUrl(payment.proofOfPaymentUrl)}?payment=${payment._id}&t=${new Date(payment.createdAt || Date.now()).getTime()}`;
                         return (
                           <>
                       <p style={{ fontSize: '0.75em', color: '#666', marginBottom: '5px' }}>
