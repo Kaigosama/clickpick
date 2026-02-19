@@ -102,10 +102,10 @@ const Auth = () => {
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-gray-900 overflow-hidden font-sans">
-      {/* Canteen Background Image - Ensure 'canteen-bg.png' is in your 'public' folder */}
+      {/* Canteen Background Image - Ensure 'canteen-bg.jpg' is in your 'public' folder */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 hover:scale-105"
-        style={{ backgroundImage: "url('/canteen-bg.png')" }} 
+        style={{ backgroundImage: "url('/canteen-bg.jpg')" }} 
       />
 
       {/* The Dark Glass Scrim - fills entire screen behind content */}

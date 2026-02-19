@@ -13,6 +13,23 @@ const OrderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['gcash', 'cash'], required: true },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'refunded'], default: 'pending' },
+  readyAt: { type: Date },
+  gracePeriodExpiresAt: { type: Date },
+  autoCancelledAt: { type: Date },
+  cancellationReason: {
+    type: String,
+    enum: ['none', 'manual_cancel', 'grace_period_expired'],
+    default: 'none'
+  },
+  refundRequired: { type: Boolean, default: false },
+  refundStatus: {
+    type: String,
+    enum: ['not_required', 'pending', 'proof_sent'],
+    default: 'not_required'
+  },
+  refundProofUrl: { type: String },
+  refundProofPath: { type: String },
+  refundProofSentAt: { type: Date },
   status: { 
     type: String, 
     enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'], 

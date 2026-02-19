@@ -13,23 +13,8 @@ import Checkout from './pages/Checkout';
 import GCashPayment from './pages/GCashPayment';
 import PaymentWaiting from './pages/PaymentWaiting';
 
-// Component to handle root route - redirects based on authentication and role
+// Root route should always show auth page first
 const AuthOrDashboard = () => {
-  const token = localStorage.getItem('token');
-  const storedUser = localStorage.getItem('user');
-
-  if (token && storedUser) {
-    const user = JSON.parse(storedUser);
-    // Redirect based on role
-    if (user.role === 'stall_staff') {
-      const stallId = user.stallId || user._id || '1';
-      return <Navigate to={`/stall/${stallId}`} replace />;
-    } else if (user.role === 'customer') {
-      return <Navigate to="/menu" replace />;
-    }
-  }
-
-  // Not logged in - show auth page
   return <Auth />;
 };
 

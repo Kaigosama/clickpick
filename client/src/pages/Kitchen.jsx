@@ -10,6 +10,9 @@ const Kitchen = () => {
   const [report, setReport] = useState(null);
   const [showQueueFlow, setShowQueueFlow] = useState(true);
   const [selectedProof, setSelectedProof] = useState(null);
+  const [refundProofFiles, setRefundProofFiles] = useState({});
+  const [refundNotes, setRefundNotes] = useState({});
+  const [nowTs, setNowTs] = useState(Date.now());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,6 +35,14 @@ const Kitchen = () => {
       fetchPendingPayments();
     }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
   }, []);
 
   const fetchItems = async () => {
@@ -97,6 +108,35 @@ const Kitchen = () => {
     }
   };
 
+  const submitRefundProof = async (orderId) => {
+    const selectedFile = refundProofFiles[orderId];
+    if (!selectedFile) {
+      alert('Please upload refund proof first.');
+      return;
+    }
+
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const formData = new FormData();
+      formData.append('refundProof', selectedFile);
+      formData.append('note', refundNotes[orderId] || '');
+      formData.append('staffId', user?._id || '');
+
+      await axios.post(`http://localhost:5000/api/orders/${orderId}/refund-proof`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      alert('Refund proof submitted and customer notified by SMS.');
+      setRefundProofFiles(prev => ({ ...prev, [orderId]: null }));
+      setRefundNotes(prev => ({ ...prev, [orderId]: '' }));
+      fetchOrders();
+    } catch (err) {
+      alert("Failed to submit refund proof: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     await axios.post('http://localhost:5000/api/menu', newItem);
@@ -137,6 +177,31 @@ const Kitchen = () => {
     const preparing = getPreparingOrders().length;
     const ready = getReadyOrders().length;
     return { pending, preparing, ready, total: pending + preparing + ready };
+  };
+
+  const getRemainingGraceMs = (order) => {
+    if (!order) return 0;
+    const expiry = order.gracePeriodExpiresAt
+      ? new Date(order.gracePeriodExpiresAt).getTime()
+      : order.readyAt
+      ? new Date(order.readyAt).getTime() + (15 * 60 * 1000)
+      : null;
+
+    if (!expiry) return 0;
+    return expiry - nowTs;
+  };
+
+  const formatCountdown = (remainingMs) => {
+    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  };
+
+  const getRefundRequiredOrders = () => {
+    return orders
+      .filter(o => o.status?.toLowerCase() === 'cancelled' && o.paymentMethod === 'gcash' && o.refundRequired && o.refundStatus === 'pending')
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   };
 
   return (
@@ -576,9 +641,75 @@ const Kitchen = () => {
                           <p style={{ margin: 0, fontSize: '0.95em', fontWeight: 'bold' }}>{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
                         </div>
                       </div>
+                      <p style={{ margin: '8px 0', fontSize: '0.9em' }}>
+                        <strong>Customer No.:</strong> {order.customerId?.phone || 'Not provided'}
+                      </p>
+                      <div style={{ marginTop: '8px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.15)' }}>
+                        <p style={{ margin: 0, fontSize: '0.85em', opacity: 0.9 }}><strong>Grace Timer (15 min):</strong></p>
+                        <p style={{ margin: '4px 0 0 0', fontWeight: 'bold', fontSize: '1.1em', color: getRemainingGraceMs(order) <= 0 ? '#ffeb3b' : 'white' }}>
+                          {getRemainingGraceMs(order) <= 0 ? 'EXPIRED - auto-cancelling...' : formatCountdown(getRemainingGraceMs(order))}
+                        </p>
+                      </div>
                       <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
                         <button onClick={() => updateOrderStatus(order._id, 'completed')} style={{flex: 1, background: '#6c757d', color: 'white', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Mark as Picked Up</button>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {getRefundRequiredOrders().length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.3em', color: '#ff5252', margin: '15px 0 10px 0' }}>💸 Manual GCash Refund Required</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '15px' }}>
+                  {getRefundRequiredOrders().map(order => (
+                    <div key={order._id} style={{ padding: '15px', background: 'rgba(244, 67, 54, 0.2)', border: '2px solid #ff5252', borderRadius: '8px', color: 'white' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '1.2em', fontWeight: 'bold' }}>Order #{order.queueNumber}</span>
+                        <span style={{ background: '#ff5252', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.8em' }}>
+                          REFUND NEEDED
+                        </span>
+                      </div>
+
+                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>Amount:</strong> ₱{order.totalAmount}</p>
+                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>Customer:</strong> {order.customerId?.name || 'N/A'}</p>
+                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>GCash Number:</strong> {order.customerId?.phone || 'Not provided'}</p>
+                      <p style={{ margin: '10px 0', fontSize: '0.85em', color: '#ffe0e0' }}>
+                        Auto-cancelled after 15 minutes unclaimed. Process refund in GCash, then upload proof below.
+                      </p>
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setRefundProofFiles(prev => ({ ...prev, [order._id]: e.target.files?.[0] || null }))}
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+
+                      <input
+                        type="text"
+                        placeholder="Optional note"
+                        value={refundNotes[order._id] || ''}
+                        onChange={(e) => setRefundNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', marginBottom: '10px' }}
+                      />
+
+                      <button
+                        onClick={() => submitRefundProof(order._id)}
+                        disabled={!refundProofFiles[order._id]}
+                        style={{
+                          width: '100%',
+                          background: refundProofFiles[order._id] ? '#4caf50' : '#999',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          cursor: refundProofFiles[order._id] ? 'pointer' : 'not-allowed',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Send Refund Proof + SMS
+                      </button>
                     </div>
                   ))}
                 </div>

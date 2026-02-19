@@ -9,6 +9,7 @@ const authRoute = require('./routes/auth');
 const menuRoute = require('./routes/menu');
 const orderRoute = require('./routes/orders');
 const paymentsRoute = require('./routes/payments');
+const { processExpiredReadyOrders } = require('./utils/orderGraceService');
 
 dotenv.config();
 const app = express();
@@ -30,6 +31,17 @@ app.use('/api/auth', authRoute);
 app.use('/api/menu', menuRoute);
 app.use('/api/orders', orderRoute);
 app.use('/api/payments', paymentsRoute);
+
+setInterval(async () => {
+  try {
+    const { processedCount } = await processExpiredReadyOrders();
+    if (processedCount > 0) {
+      console.log(`⏰ Auto-cancelled ${processedCount} expired ready order(s).`);
+    }
+  } catch (err) {
+    console.error('Grace period processor error:', err.message);
+  }
+}, 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

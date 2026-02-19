@@ -1,0 +1,58 @@
+const Order = require('../models/Order');
+const User = require('../models/User');
+const { sendStatusSMS } = require('./smsService');
+
+const GRACE_PERIOD_MINUTES = 15;
+const GRACE_PERIOD_MS = GRACE_PERIOD_MINUTES * 60 * 1000;
+
+const processExpiredReadyOrders = async () => {
+  const now = new Date();
+  const fallbackCutoff = new Date(now.getTime() - GRACE_PERIOD_MS);
+
+  const expiredOrders = await Order.find({
+    status: 'ready',
+    $or: [
+      { gracePeriodExpiresAt: { $lte: now } },
+      {
+        gracePeriodExpiresAt: { $exists: false },
+        updatedAt: { $lte: fallbackCutoff }
+      }
+    ]
+  }).populate('customerId', 'phone');
+
+  let processedCount = 0;
+
+  for (const order of expiredOrders) {
+    const needsRefund = order.paymentMethod === 'gcash' && order.paymentStatus === 'paid';
+
+    order.status = 'cancelled';
+    order.autoCancelledAt = now;
+    order.cancellationReason = 'grace_period_expired';
+    order.refundRequired = needsRefund;
+    order.refundStatus = needsRefund ? 'pending' : 'not_required';
+
+    await order.save();
+    processedCount += 1;
+
+    let customerPhone = order.customerId?.phone;
+    if (!customerPhone && order.customerId) {
+      const customer = await User.findById(order.customerId);
+      customerPhone = customer?.phone;
+    }
+
+    if (customerPhone) {
+      await sendStatusSMS(
+        customerPhone,
+        order.queueNumber,
+        needsRefund ? 'refund_pending' : 'cancelled'
+      );
+    }
+  }
+
+  return { processedCount };
+};
+
+module.exports = {
+  GRACE_PERIOD_MINUTES,
+  processExpiredReadyOrders
+};

@@ -24,6 +24,10 @@ const buildStatusMessage = (status, queueNumber) => {
       return `ClickPick: Payment for Order #${queueNumber} has been approved.`;
     case 'rejected':
       return `ClickPick: Payment for Order #${queueNumber} was rejected.`;
+    case 'refund_pending':
+      return `ClickPick: Order #${queueNumber} was not claimed within 15 minutes and is now cancelled. Please wait for your GCash refund from the canteen staff.`;
+    case 'refund_sent':
+      return `ClickPick: Refund for Order #${queueNumber} has been sent via GCash by the canteen staff.`;
     default:
       return `ClickPick: Order #${queueNumber} status updated to ${status}.`;
   }
