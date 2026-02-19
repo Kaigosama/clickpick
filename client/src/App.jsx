@@ -57,7 +57,7 @@ const TitleManager = () => {
 // Simple protection to ensure only logged-in users access internal pages
 const PrivateRoute = ({ children, role }) => {
   const { user, loading } = useContext(AuthContext);
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
 
   if (loading) return null;
 

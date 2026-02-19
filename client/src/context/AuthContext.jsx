@@ -6,7 +6,24 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const getStoredToken = () => {
+    return sessionStorage.getItem('token') || localStorage.getItem('token');
+  };
+
+  const getStoredUser = () => {
+    return sessionStorage.getItem('user') || localStorage.getItem('user');
+  };
+
+  const setSessionAuth = (token, userData) => {
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(userData));
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  };
+
   const clearAuth = () => {
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -23,12 +40,13 @@ export const AuthProvider = ({ children }) => {
   // Check if user is already logged in when the app starts
   useEffect(() => {
     const checkLoggedIn = async () => {
-      const token = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user'); // We will store user info as a JSON string
+      const token = getStoredToken();
+      const storedUser = getStoredUser();
 
       if (token && storedUser) {
         const parsedUser = parseStoredUser(storedUser);
         if (parsedUser?._id && parsedUser?.role) {
+          setSessionAuth(token, parsedUser);
           setUser(parsedUser);
         } else {
           clearAuth();
@@ -43,8 +61,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData, token) => {
     clearAuth();
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    setSessionAuth(token, userData);
     setUser(userData);
   };
 
@@ -54,7 +71,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (updatedUserData) => {
-    localStorage.setItem('user', JSON.stringify(updatedUserData));
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      setSessionAuth(token, updatedUserData);
+    }
     setUser(updatedUserData);
   };
 
