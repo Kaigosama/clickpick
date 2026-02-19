@@ -238,7 +238,7 @@ const Menu = () => {
                 </div>
                 
                 {/* Stall Name */}
-                <h2 className="text-xs sm:text-xl font-bold text-gray-900 leading-tight line-clamp-2 min-h-[2rem] sm:min-h-0">
+                <h2 className="text-sm sm:text-xl font-bold text-gray-900 leading-tight line-clamp-2 min-h-[2rem] sm:min-h-0">
                   {stall.name}
                 </h2>
               </button>

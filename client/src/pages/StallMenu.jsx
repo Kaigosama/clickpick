@@ -28,6 +28,7 @@ const StallMenu = () => {
   const [showQueueFlow, setShowQueueFlow] = useState(true);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
+  const [showCustomerMobileMenu, setShowCustomerMobileMenu] = useState(false);
   const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);
   const [cancelledOrders, setCancelledOrders] = useState([]);
@@ -498,7 +499,7 @@ const StallMenu = () => {
               <span className="text-xl font-bold">ClickPick</span>
             </div>
 
-            <nav className="flex items-center gap-8">
+            <nav className="hidden sm:flex items-center gap-8">
               <button 
                 onClick={() => navigate('/menu')}
                 className="hover:opacity-80 font-semibold text-lg"
@@ -513,8 +514,67 @@ const StallMenu = () => {
               </button>
             </nav>
 
-            <div className="flex items-center gap-6">
-              <div className="relative">
+            <div className="flex items-center gap-3 sm:gap-6">
+              <div className="sm:hidden relative">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
+                    {user?.name || 'User'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowCustomerMobileMenu(!showCustomerMobileMenu);
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                    aria-label="Open navigation menu"
+                  >
+                    ☰
+                  </button>
+                </div>
+
+                {showCustomerMobileMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        navigate('/menu');
+                        setShowCustomerMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      🏪 Stores
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/my-orders');
+                        setShowCustomerMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                    >
+                      📋 My Orders
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/profile');
+                        setShowCustomerMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                    >
+                      👤 Edit Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCustomerMobileMenu(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative hidden sm:block">
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
@@ -1240,11 +1300,11 @@ const StallMenu = () => {
                                     )}
                                   </div>
                                     <div className="w-full min-w-0">
-                                      <h3 className="text-xs sm:text-lg font-semibold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
+                                      <h3 className="text-sm sm:text-lg font-semibold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
                                       {item.name}
                                     </h3>
-                                      <p className="text-[11px] sm:text-sm text-gray-600 text-center mt-0.5">Qty: <span className="font-bold">{item.quantity ?? 0}</span></p>
-                                      <p className={`text-[10px] sm:text-xs font-semibold mt-0.5 text-center ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      <p className="text-xs sm:text-sm text-gray-600 text-center mt-0.5">Qty: <span className="font-bold">{item.quantity ?? 0}</span></p>
+                                      <p className={`text-xs sm:text-xs font-semibold mt-0.5 text-center ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                       {item.quantity > 0 ? 'Available' : 'Not Available'}
                                     </p>
                                     <button
@@ -1252,7 +1312,7 @@ const StallMenu = () => {
                                         e.stopPropagation(); 
                                         setEditingItem(item);
                                       }}
-                                        className="mt-2 sm:mt-3 px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-400 rounded text-[11px] sm:text-sm font-semibold hover:bg-gray-100 w-full"
+                                        className="mt-2 sm:mt-3 px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-400 rounded text-xs sm:text-sm font-semibold hover:bg-gray-100 w-full"
                                     >
                                       Edit Item
                                     </button>
@@ -1310,15 +1370,15 @@ const StallMenu = () => {
                                 </div>
                                 
                                 <div className="p-2 sm:p-4 flex flex-col flex-1 min-w-0">
-                                  <h3 className="text-xs sm:text-lg font-bold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
+                                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
                                     {item.name}
                                   </h3>
-                                  <p className={`text-[10px] sm:text-xs italic text-gray-600 text-center mt-1 min-h-[2rem] sm:min-h-[2.5rem] line-clamp-2 ${variationNames ? '' : 'opacity-0'}`}>
+                                  <p className={`text-xs sm:text-xs italic text-gray-600 text-center mt-1 min-h-[2rem] sm:min-h-[2.5rem] line-clamp-2 ${variationNames ? '' : 'opacity-0'}`}>
                                     {variationNames || 'No variation'}
                                   </p>
-                                  <p className="text-base sm:text-2xl font-bold text-gray-900 my-1 sm:my-2">₱{item.price}</p>
+                                  <p className="text-lg sm:text-2xl font-bold text-gray-900 my-1 sm:my-2">₱{item.price}</p>
                                   
-                                  <p className={`text-[10px] sm:text-xs mb-2 sm:mb-3 text-center ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                                  <p className={`text-xs sm:text-xs mb-2 sm:mb-3 text-center ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
                                     {isAvailable ? `Available: ${availableQty}` : 'Not Available'}
                                   </p>
 
@@ -1327,7 +1387,7 @@ const StallMenu = () => {
                                       onClick={(e) => e.stopPropagation()}
                                       className="border border-gray-400 sm:border-2 rounded px-2 sm:px-3 py-1 sm:py-2 mb-2 sm:mb-3"
                                     >
-                                      <p className="text-center text-[11px] sm:text-sm font-semibold text-gray-700">{quantity}</p>
+                                      <p className="text-center text-xs sm:text-sm font-semibold text-gray-700">{quantity}</p>
                                       <div className="flex items-center justify-between gap-2 mt-1">
                                         <button
                                           onClick={(e) => {
@@ -1341,7 +1401,7 @@ const StallMenu = () => {
                                         >
                                           −
                                         </button>
-                                        <span className="text-[10px] sm:text-xs font-semibold text-gray-600">Qty</span>
+                                        <span className="text-xs sm:text-xs font-semibold text-gray-600">Qty</span>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1359,7 +1419,7 @@ const StallMenu = () => {
                                   )}
 
                                   {requiresRiceChoice && (
-                                    <p className="text-[10px] sm:text-xs text-gray-600 mb-2 sm:mb-3 min-h-[1rem] sm:min-h-[1.25rem]">Select rice option before adding.</p>
+                                    <p className="text-xs sm:text-xs text-gray-600 mb-2 sm:mb-3 min-h-[1rem] sm:min-h-[1.25rem]">Select rice option before adding.</p>
                                   )}
 
                                   <button 
@@ -1382,7 +1442,7 @@ const StallMenu = () => {
                                         [item._id]: 0
                                       }));
                                     }}
-                                    className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-[11px] sm:text-sm ${
+                                    className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-xs sm:text-sm ${
                                       !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                         : 'bg-[#8B0000] text-white hover:bg-red-800'

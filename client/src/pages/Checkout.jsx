@@ -11,6 +11,7 @@ const Checkout = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stalls, setStalls] = useState([]);
   const [orderSuccess, setOrderSuccess] = useState(null);
@@ -231,7 +232,7 @@ const Checkout = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
+          <nav className="hidden sm:flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -247,8 +248,64 @@ const Checkout = () => {
           </nav>
 
           {/* User Profile */}
-          <div className="flex items-center gap-6">
-            <div className="relative">
+          <div className="flex items-center gap-3 sm:gap-6">
+            <div className="sm:hidden relative">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
+                  {user?.name || 'User'}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowMobileNavMenu(!showMobileNavMenu);
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                  aria-label="Open navigation menu"
+                >
+                  ☰
+                </button>
+              </div>
+
+              {showMobileNavMenu && (
+                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
+                  <button
+                    onClick={() => setShowMobileNavMenu(false)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  >
+                    🏪 Stores
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/my-orders');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                  >
+                    📋 My Orders
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/profile');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                  >
+                    👤 Edit Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMobileNavMenu(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="relative hidden sm:block">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"

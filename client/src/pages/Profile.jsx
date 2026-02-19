@@ -19,6 +19,7 @@ const Profile = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -120,6 +121,61 @@ const Profile = () => {
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
             <span className="text-xl font-bold">{isStaff ? 'ClickPick Canteen Dashboard' : 'ClickPick'}</span>
           </div>
+
+          <div className="sm:hidden relative">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
+                {user?.name || (isStaff ? 'Staff' : 'User')}
+              </p>
+              <button
+                onClick={() => setShowMobileNavMenu(!showMobileNavMenu)}
+                className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                aria-label="Open navigation menu"
+              >
+                ☰
+              </button>
+            </div>
+
+            {showMobileNavMenu && (
+              <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48 overflow-hidden">
+                <button
+                  onClick={() => {
+                    if (isStaff) {
+                      const stallId = user?.stallId || user?._id;
+                      navigate(`/stall/${stallId}`);
+                    } else {
+                      navigate('/menu');
+                    }
+                    setShowMobileNavMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                >
+                  {isStaff ? '🏪 Dashboard' : '🏪 Stores'}
+                </button>
+                {!isStaff && (
+                  <button
+                    onClick={() => {
+                      navigate('/my-orders');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  >
+                    📋 My Orders
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowMobileNavMenu(false);
+                    handleLogout();
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                >
+                  🚪 Logout
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => {
               if (isStaff) {
@@ -129,7 +185,7 @@ const Profile = () => {
                 navigate('/menu');
               }
             }}
-            className="text-white hover:opacity-80 font-semibold"
+            className="hidden sm:inline text-white hover:opacity-80 font-semibold"
           >
             ← {isStaff ? 'Back to Dashboard' : 'Back to Stores'}
           </button>
