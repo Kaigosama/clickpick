@@ -222,6 +222,15 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {showMobileNavMenu && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          onClick={() => setShowMobileNavMenu(false)}
+          className="sm:hidden fixed inset-0 z-[45] bg-transparent"
+        />
+      )}
+
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">

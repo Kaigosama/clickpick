@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useContext, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
 import Auth from './pages/Auth';
@@ -28,6 +28,29 @@ const ProfileRedirect = () => {
   }
 
   return <Profile />;
+};
+
+const TitleManager = () => {
+  const { user } = useContext(AuthContext);
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+
+    if (path === '/' || path === '/auth') {
+      document.title = 'ClickPick';
+      return;
+    }
+
+    if (user?.role === 'stall_staff') {
+      document.title = 'Canteen Staff';
+      return;
+    }
+
+    document.title = 'Customer';
+  }, [location.pathname, user?.role]);
+
+  return null;
 };
 
 // Simple protection to ensure only logged-in users access internal pages
@@ -73,6 +96,7 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
+        <TitleManager />
         <div className="app-container">
           <Routes>
             {/* Public Route: Login/Register - Auto-redirects if already logged in */}

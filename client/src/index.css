@@ -7,6 +7,8 @@ body,
 #root {
 	width: 100%;
 	min-height: 100%;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
 }
 
 body {
@@ -27,10 +29,6 @@ svg {
 }
 
 @media (max-width: 640px) {
-	html {
-		font-size: 14px;
-	}
-
 	body {
 		line-height: 1.45;
 	}
@@ -70,10 +68,10 @@ svg {
 	button {
 		max-width: 100%;
 	}
-}
 
-@media (max-width: 420px) {
-	html {
-		font-size: 13px;
+	input,
+	select,
+	textarea {
+		font-size: 16px;
 	}
 }
