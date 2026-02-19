@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
+const SequenceCounter = require('../models/SequenceCounter');
 const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
 const { sendStatusSMS } = require('../utils/smsService');
@@ -57,16 +58,23 @@ const calculateEstimatedTime = async (items, stallId) => {
   return Math.max(5, Math.min(60, Math.round(totalTime)));
 };
 
+const getNextSequenceValue = async (key) => {
+  const counter = await SequenceCounter.findOneAndUpdate(
+    { key },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return counter.seq;
+};
+
 const getNextOrderIdentifiers = async (stallId) => {
-  const [orderCount, storeQueueCount] = await Promise.all([
-    Order.countDocuments(),
-    Order.countDocuments({ stallId })
+  const [orderNumber, queueNumber] = await Promise.all([
+    getNextSequenceValue('order-number'),
+    getNextSequenceValue(`queue-number:${String(stallId)}`)
   ]);
 
-  return {
-    orderNumber: orderCount + 1,
-    queueNumber: storeQueueCount + 1
-  };
+  return { orderNumber, queueNumber };
 };
 
 // Create uploads directory if it doesn't exist
@@ -413,25 +421,29 @@ router.get('/pending-payments', async (req, res) => {
     const requestedStallId = req.query.stallId;
     const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : requestedStallId;
 
-    const payments = await Payment.find({
+    const paymentQuery = {
       status: 'pending'
-    })
-    .populate('customerId', 'name email phone')
-    .populate({
-      path: 'orderDbId',
-      select: 'orderNumber queueNumber _id stallId',
-      ...(effectiveStallId ? { match: { stallId: effectiveStallId } } : {})
-    })
-    .sort({ createdAt: -1 });
+    };
 
-    const filteredPayments = effectiveStallId
-      ? payments.filter((payment) => payment.orderDbId)
-      : payments;
+    if (effectiveStallId) {
+      const storeOrderIds = await Order.find({ stallId: effectiveStallId }).select('_id');
+      paymentQuery.orderDbId = {
+        $in: storeOrderIds.map((order) => order._id)
+      };
+    }
+
+    const payments = await Payment.find(paymentQuery)
+      .populate('customerId', 'name email phone')
+      .populate({
+        path: 'orderDbId',
+        select: 'orderNumber queueNumber _id stallId'
+      })
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      payments: filteredPayments,
-      count: filteredPayments.length
+      payments,
+      count: payments.length
     });
   } catch (err) {
     console.error('Fetch pending error:', err);

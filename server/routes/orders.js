@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Order = require('../models/Order');
+const SequenceCounter = require('../models/SequenceCounter');
 const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
 const { sendStatusSMS } = require('../utils/smsService');
@@ -53,16 +54,23 @@ const calculateEstimatedTime = async (items, stallId) => {
   return Math.max(5, Math.min(60, Math.round(totalTime)));
 };
 
+const getNextSequenceValue = async (key) => {
+  const counter = await SequenceCounter.findOneAndUpdate(
+    { key },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return counter.seq;
+};
+
 const getNextOrderIdentifiers = async (stallId) => {
-  const [orderCount, storeQueueCount] = await Promise.all([
-    Order.countDocuments(),
-    Order.countDocuments({ stallId })
+  const [orderNumber, queueNumber] = await Promise.all([
+    getNextSequenceValue('order-number'),
+    getNextSequenceValue(`queue-number:${String(stallId)}`)
   ]);
 
-  return {
-    orderNumber: orderCount + 1,
-    queueNumber: storeQueueCount + 1
-  };
+  return { orderNumber, queueNumber };
 };
 
 const getGracePeriodExpiry = (readyAt = new Date()) => {
