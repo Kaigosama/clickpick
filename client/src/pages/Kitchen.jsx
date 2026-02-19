@@ -56,8 +56,9 @@ const Kitchen = () => {
   };
 
   const fetchOrders = async () => {
+    if (!user?._id) return;
     try {
-      const res = await api.get(`/orders?stallId=${user?._id || ''}`);
+      const res = await api.get(`/orders?stallId=${user._id}`);
       setOrders(res.data);
     } catch (err) {
       console.error("Error fetching orders", err);
@@ -65,8 +66,9 @@ const Kitchen = () => {
   };
 
   const fetchPendingPayments = async () => {
+    if (!user?._id) return;
     try {
-      const res = await api.get(`/payments/pending-payments?stallId=${user?._id || ''}`);
+      const res = await api.get(`/payments/pending-payments?stallId=${user._id}`);
       console.log('Pending payments response:', res.data);
       console.log('Payments array:', res.data.payments);
       setPendingPayments(res.data.payments || []);
@@ -76,9 +78,10 @@ const Kitchen = () => {
   };
 
   const approvePayment = async (paymentId) => {
+    if (!user?._id) return;
     try {
       await api.post(`/payments/gcash-approve/${paymentId}`, {
-        stallId: user?._id
+        stallId: user._id
       });
       alert("Payment approved successfully!");
       fetchPendingPayments();
@@ -89,13 +92,14 @@ const Kitchen = () => {
   };
 
   const rejectPayment = async (paymentId) => {
+    if (!user?._id) return;
     const reason = prompt("Enter reason for rejection:");
     if (!reason) return;
 
     try {
       await api.post(`/payments/gcash-reject/${paymentId}`, {
         reason: reason,
-        stallId: user?._id
+        stallId: user._id
       });
       alert("Payment rejected");
       fetchPendingPayments();

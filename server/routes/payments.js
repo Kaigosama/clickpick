@@ -204,6 +204,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     const payment = new Payment({
       orderId: stableOrderId,
       orderDbId: savedOrder._id, // Reference to the actual Order document
+      stallId: effectiveStallId,
       customerId: customerId,
       paymentMethod: 'gcash',
       amount: totalAmount || req.body.amount || 0,
@@ -282,7 +283,9 @@ router.post('/gcash-approve/:paymentId', async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
-    const paymentStallId = existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '';
+    const paymentStallId = existingPayment.stallId
+      ? String(existingPayment.stallId)
+      : (existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '');
     if (!paymentStallId || paymentStallId !== String(effectiveStallId)) {
       return res.status(403).json({ message: 'You can only approve payments for your own store' });
     }
@@ -348,7 +351,9 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
-    const paymentStallId = existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '';
+    const paymentStallId = existingPayment.stallId
+      ? String(existingPayment.stallId)
+      : (existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '');
     if (!paymentStallId || paymentStallId !== String(effectiveStallId)) {
       return res.status(403).json({ message: 'You can only reject payments for your own store' });
     }
@@ -419,18 +424,17 @@ router.get('/pending-payments', async (req, res) => {
   try {
     const requester = await getRequesterFromToken(req);
     const requestedStallId = req.query.stallId;
-    const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : requestedStallId;
+    const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : String(requestedStallId || '').trim();
+
+    if (!effectiveStallId) {
+      return res.status(200).json({ success: true, payments: [], count: 0 });
+    }
 
     const paymentQuery = {
       status: 'pending'
     };
 
-    if (effectiveStallId) {
-      const storeOrderIds = await Order.find({ stallId: effectiveStallId }).select('_id');
-      paymentQuery.orderDbId = {
-        $in: storeOrderIds.map((order) => order._id)
-      };
-    }
+    paymentQuery.stallId = effectiveStallId;
 
     const payments = await Payment.find(paymentQuery)
       .populate('customerId', 'name email phone')
@@ -440,10 +444,15 @@ router.get('/pending-payments', async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
+    const finalPayments = payments.filter((payment) => {
+      if (!payment.orderDbId?.stallId) return true;
+      return String(payment.orderDbId.stallId) === String(effectiveStallId);
+    });
+
     res.json({
       success: true,
-      payments,
-      count: payments.length
+      payments: finalPayments,
+      count: finalPayments.length
     });
   } catch (err) {
     console.error('Fetch pending error:', err);

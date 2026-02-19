@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const PaymentSchema = new mongoose.Schema({
   orderId: { type: String, required: true, unique: true }, // Custom order ID for tracking
   orderDbId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' }, // Reference to Order document
+  stallId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Customer who made the payment
   amount: { type: Number, required: true }, // Payment amount
   paymentMethod: { type: String, enum: ['gcash', 'cash'], required: true },
