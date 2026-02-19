@@ -70,7 +70,7 @@ const StallMenu = () => {
 
   const resolveItemImage = (image) => {
     if (!image) return null;
-    return image.startsWith('http') ? image : `http://localhost:5000${image}`;
+    return toServerAssetUrl(image);
   };
 
   useEffect(() => {

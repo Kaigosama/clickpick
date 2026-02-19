@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
@@ -105,7 +106,7 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           <div className="bg-[#8B0000] h-48 rounded-lg flex items-center justify-center text-8xl mb-8 border-2 border-gray-300 overflow-hidden">
             {item.image ? (
               <img
-                src={item.image.startsWith('http') ? item.image : `http://localhost:5000${item.image}`}
+                src={toServerAssetUrl(item.image)}
                 alt={item.name}
                 className="w-full h-full object-cover"
               />

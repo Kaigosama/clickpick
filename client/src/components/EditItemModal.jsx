@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const EditItemModal = ({ item, onClose, onSave, onDelete }) => {
   const initialImagePreview = item.image
-    ? (item.image.startsWith('http') ? item.image : `http://localhost:5000${item.image}`)
+    ? toServerAssetUrl(item.image)
     : null;
 
   const [formData, setFormData] = useState({
