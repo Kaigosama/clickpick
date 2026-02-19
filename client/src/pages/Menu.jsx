@@ -12,6 +12,7 @@ const Menu = () => {
   const { cartItems, removeFromCart, addToCart, cartTotal, clearCart } = useCart();
   const [showCartPreview, setShowCartPreview] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
 
   const [stalls, setStalls] = useState([]);
 
@@ -96,7 +97,7 @@ const Menu = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
+          <nav className="hidden sm:flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button onClick={() => {}} className="hover:opacity-80 font-semibold text-lg">
               STORES
             </button>
@@ -106,8 +107,66 @@ const Menu = () => {
           </nav>
 
           {/* User Profile & Cart */}
-          <div className="flex items-center gap-6">
-            <div className="relative">
+          <div className="flex items-center gap-3 sm:gap-6">
+            <div className="sm:hidden relative">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
+                  {user?.name || 'User'}
+                </p>
+                <button
+                  onClick={() => {
+                    setShowMobileNavMenu(!showMobileNavMenu);
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                  aria-label="Open navigation menu"
+                >
+                  ☰
+                </button>
+              </div>
+
+              {showMobileNavMenu && (
+                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  >
+                    🏪 Stores
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/my-orders');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                  >
+                    📋 My Orders
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/profile');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                  >
+                    👤 Edit Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMobileNavMenu(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="relative hidden sm:block">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
@@ -153,9 +212,9 @@ const Menu = () => {
         <p className="text-gray-600 mb-8">Select a stall to view their menu items</p>
 
         {/* Stalls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-6">
           {stalls.length === 0 ? (
-            <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 text-center py-12 bg-white rounded-lg">
+            <div className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 text-center py-12 bg-white rounded-lg">
               No canteen stalls available yet
             </div>
           ) : (
@@ -163,10 +222,10 @@ const Menu = () => {
               <button
                 key={stall.id}
                 onClick={() => handleStallClick(stall.id)}
-                className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow hover:scale-105 transform duration-200 p-6 flex flex-col items-center justify-center text-center border-2 border-gray-200 hover:border-[#8B0000] cursor-pointer"
+                className="bg-white rounded-lg shadow-md sm:shadow-lg hover:shadow-xl transition-shadow p-3 sm:p-6 flex flex-col items-center justify-center text-center border-2 border-gray-200 hover:border-[#8B0000] cursor-pointer"
               >
                 {/* Logo/Icon */}
-                <div className="w-24 h-24 bg-[#8B0000] rounded flex items-center justify-center mb-4 text-5xl overflow-hidden">
+                <div className="w-14 h-14 sm:w-24 sm:h-24 bg-[#8B0000] rounded flex items-center justify-center mb-2 sm:mb-4 text-2xl sm:text-5xl overflow-hidden">
                   {stall.logoUrl ? (
                     <img
                       src={toServerAssetUrl(stall.logoUrl)}
@@ -174,7 +233,7 @@ const Menu = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-white">🍽️</span>
+                    <h2 className="text-xs sm:text-xl font-bold text-gray-900 leading-tight line-clamp-2 min-h-[2rem] sm:min-h-0">
                   )}
                 </div>
                 

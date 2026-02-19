@@ -28,6 +28,7 @@ const StallMenu = () => {
   const [showQueueFlow, setShowQueueFlow] = useState(true);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
+  const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);
   const [cancelledOrders, setCancelledOrders] = useState([]);
   const [refundProofFiles, setRefundProofFiles] = useState({});
@@ -592,10 +593,88 @@ const StallMenu = () => {
               <div className="hidden sm:flex flex-col text-right mr-2">
                 <span className="font-semibold text-sm uppercase">{(user?.name || 'DELA CRUZ, JUAN A.').toUpperCase()}</span>
               </div>
+
+              <div className="sm:hidden relative">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm uppercase max-w-[130px] truncate">
+                    {user?.name || 'Staff'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowStaffMobileMenu(!showStaffMobileMenu);
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                    aria-label="Open staff menu"
+                  >
+                    ☰
+                  </button>
+                </div>
+
+                {showStaffMobileMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-52 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setActiveTab('products');
+                        setShowStaffMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      📦 Products
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('orders');
+                        setShowStaffMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      📋 Orders
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('sales');
+                        setShowStaffMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      💰 Sales
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('settings');
+                        setShowStaffMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      ⚙️ Settings
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/store-profile');
+                        setShowStaffMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      🏪 Edit Store Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowStaffMobileMenu(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#8B0000] font-bold"
+                  className="hidden sm:flex w-10 h-10 bg-white rounded-full items-center justify-center text-[#8B0000] font-bold"
                 >
                   {user?.name?.charAt(0) || 'D'}
                 </button>
