@@ -106,9 +106,34 @@ const MyOrders = () => {
       case 'ready': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-gray-100 text-gray-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'payment_rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const isPendingGcashPayment = (order) => (
+    String(order?.paymentMethod || '').toLowerCase() === 'gcash'
+    && String(order?.paymentStatus || '').toLowerCase() === 'pending'
+    && String(order?.status || '').toLowerCase() === 'pending'
+  );
+
+  const getDisplayStatus = (order) => {
+    if (String(order?.paymentMethod || '').toLowerCase() === 'gcash') {
+      const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+      if (paymentStatus === 'rejected') return 'PAYMENT REJECTED';
+      if (paymentStatus === 'pending' && String(order?.status || '').toLowerCase() === 'pending') return 'PAYMENT PENDING';
+    }
+
+    return order?.status?.toUpperCase() || 'PENDING';
+  };
+
+  const isHistoryOrder = (order) => {
+    const status = String(order?.status || '').toLowerCase();
+    const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+    return status === 'completed' || status === 'cancelled' || paymentStatus === 'rejected';
+  };
+
+  const activeOrders = orders.filter((order) => !isHistoryOrder(order));
 
   const getQueuePosition = () => {
     if (!orders.length || !allOrders.length) return null;
@@ -116,6 +141,7 @@ const MyOrders = () => {
     const userActiveOrder = orders
       .filter((order) => {
         const status = order.status?.toLowerCase();
+        if (isPendingGcashPayment(order)) return false;
         return status === 'pending' || status === 'preparing';
       })
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
@@ -124,7 +150,7 @@ const MyOrders = () => {
     
     // Filter pending and preparing orders only (in queue)
     const activeOrders = allOrders.filter(o => 
-      (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing') &&
+      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing') &&
       o._id !== userActiveOrder._id
     );
     
@@ -134,7 +160,7 @@ const MyOrders = () => {
     ).length;
     
     const totalQueueLength = activeOrders.filter(o =>
-      o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing'
+      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing')
     ).length + 1; // +1 to include user's order
     
     return { position: ordersAhead + 1, total: totalQueueLength };
@@ -142,7 +168,7 @@ const MyOrders = () => {
 
   const getPendingOrders = () => {
     return allOrders.filter(o => 
-      o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing'
+      !isPendingGcashPayment(o) && (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing')
     ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   };
 
@@ -202,6 +228,12 @@ const MyOrders = () => {
             <button onClick={() => {}} className="hover:opacity-80 font-semibold text-lg">
               MY ORDERS
             </button>
+            <button
+              onClick={() => navigate('/order-history')}
+              className="hover:opacity-80 font-semibold text-lg"
+            >
+              ORDER HISTORY
+            </button>
           </nav>
 
           {/* User Profile & Cart */}
@@ -239,6 +271,15 @@ const MyOrders = () => {
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
                   >
                     📋 My Orders
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/order-history');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                  >
+                    🧾 Order History
                   </button>
                   <button
                     onClick={() => {
@@ -306,7 +347,7 @@ const MyOrders = () => {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">My Orders</h1>
-          <p className="text-gray-600">Track your order status in real-time</p>
+          <p className="text-gray-600">Track your active order status in real-time</p>
         </div>
 
         {/* FIFO Queue Section */}
@@ -392,19 +433,27 @@ const MyOrders = () => {
           <div className="text-center py-12">
             <p className="text-gray-600">Loading your orders...</p>
           </div>
-        ) : orders.length === 0 ? (
+        ) : activeOrders.length === 0 ? (
           <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-            <p className="text-gray-600 mb-4">No orders yet</p>
-            <button
-              onClick={() => navigate('/menu')}
-              className="bg-[#8B0000] text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-800 transition-all"
-            >
-              Start Ordering
-            </button>
+            <p className="text-gray-600 mb-6">No active orders right now</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                onClick={() => navigate('/menu')}
+                className="bg-[#8B0000] text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-800 transition-all"
+              >
+                Start Ordering
+              </button>
+              <button
+                onClick={() => navigate('/order-history')}
+                className="bg-white text-[#8B0000] border-2 border-[#8B0000] font-semibold py-3 px-6 rounded-lg hover:bg-gray-50 transition-all"
+              >
+                View Order History
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
-            {orders.map(order => (
+            {activeOrders.map(order => (
               <div 
                 key={order._id} 
                 className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow overflow-hidden"
@@ -418,8 +467,8 @@ const MyOrders = () => {
                         {getStoreName(order)} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
-                    <div className={`px-4 py-2 rounded-full font-semibold text-lg ${getStatusColor(order.status)}`}>
-                      {order.status?.toUpperCase() || 'PENDING'}
+                    <div className={`px-4 py-2 rounded-full font-semibold text-lg ${getStatusColor(String(order?.paymentStatus || '').toLowerCase() === 'rejected' ? 'payment_rejected' : order.status)}`}>
+                      {getDisplayStatus(order)}
                     </div>
                   </div>
                   {order.status?.toLowerCase() === 'pending' && (
@@ -531,6 +580,12 @@ const MyOrders = () => {
                       ) : (
                         <p className="mt-2 text-sm text-gray-700">No refund is required for this order.</p>
                       )}
+                    </div>
+                  )}
+
+                  {String(order?.paymentMethod || '').toLowerCase() === 'gcash' && String(order?.paymentStatus || '').toLowerCase() === 'rejected' && (
+                    <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4">
+                      <p className="text-sm font-semibold text-red-800">Payment rejected by canteen staff</p>
                     </div>
                   )}
 

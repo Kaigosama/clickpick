@@ -9,6 +9,7 @@ import EditItemModal from '../components/EditItemModal.jsx';
 import AddItemModal from '../components/AddItemModal.jsx';
 import { getSocket } from '../services/socket.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
+import { jsPDF } from 'jspdf';
 
 const StallMenu = () => {
   const { stallId } = useParams();
@@ -191,6 +192,9 @@ const StallMenu = () => {
 
       const liveOrders = allOrders.filter((order) => {
         const status = String(order.status || '').toLowerCase();
+        if (status === 'pending' && String(order.paymentMethod || '').toLowerCase() === 'gcash' && String(order.paymentStatus || '').toLowerCase() === 'pending') {
+          return false;
+        }
         return status === 'pending' || status === 'preparing' || status === 'ready';
       });
 
@@ -234,20 +238,42 @@ const StallMenu = () => {
     }
   }, [isStaff, user?._id]);
 
-  const handleExportSales = () => {
+  const buildSalesExportRows = () => {
+    return salesOrders.map((order) => {
+      const placedAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A';
+      const completedAt = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A';
+      const items = order.items?.map((item) => `${item.quantity || 1}x ${item.name}`).join(', ') || 'N/A';
+      const orderId = order.queueNumber || order._id;
+      const payment = order.paymentMethod?.toUpperCase() || 'CASH';
+
+      return {
+        placedAt,
+        items,
+        orderId,
+        payment,
+        completedAt
+      };
+    });
+  };
+
+  const getSalesExportFilename = (extension) => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    return `sales-report-${stamp}.${extension}`;
+  };
+
+  const handleExportSalesCSV = () => {
     if (!salesOrders.length) {
       alert('No sales data to export.');
       return;
     }
 
-    const rows = salesOrders.map((order) => {
-      const placedAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A';
-      const completedAt = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A';
-      const items = order.items?.map(i => i.name).join(', ') || 'N/A';
-      const orderId = order.queueNumber || order._id;
-      const payment = order.paymentMethod?.toUpperCase() || 'CASH';
-      return [placedAt, items, orderId, payment, completedAt];
-    });
+    const rows = buildSalesExportRows().map((row) => [
+      row.placedAt,
+      row.items,
+      row.orderId,
+      row.payment,
+      row.completedAt
+    ]);
 
     const header = ['ORDER PLACED DATE/TIME', 'ITEM', 'ORDER ID', 'PAYMENT', 'ORDER COMPLETED DATE/TIME'];
     const csv = [header, ...rows]
@@ -258,11 +284,97 @@ const StallMenu = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'sales-report.csv';
+    link.download = getSalesExportFilename('csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportSalesPDF = () => {
+    if (!salesOrders.length) {
+      alert('No sales data to export.');
+      return;
+    }
+
+    const rows = buildSalesExportRows();
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    const leftMargin = 10;
+    const rightMargin = 10;
+    const topMargin = 12;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const tableWidth = pageWidth - leftMargin - rightMargin;
+
+    const columns = [
+      { key: 'placedAt', label: 'ORDER PLACED DATE/TIME', width: 50 },
+      { key: 'items', label: 'ITEM', width: 95 },
+      { key: 'orderId', label: 'ORDER ID', width: 35 },
+      { key: 'payment', label: 'PAYMENT', width: 25 },
+      { key: 'completedAt', label: 'ORDER COMPLETED DATE/TIME', width: 55 }
+    ];
+
+    const widthScale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
+    const scaledColumns = columns.map((column) => ({ ...column, width: column.width * widthScale }));
+
+    const renderHeader = (y) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      let x = leftMargin;
+
+      scaledColumns.forEach((column) => {
+        doc.rect(x, y, column.width, 8);
+        doc.text(column.label, x + 1.5, y + 5.2, { maxWidth: column.width - 3 });
+        x += column.width;
+      });
+
+      return y + 8;
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Sales Report', leftMargin, topMargin);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, leftMargin, topMargin + 5);
+
+    let currentY = topMargin + 10;
+    currentY = renderHeader(currentY);
+
+    rows.forEach((row) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+
+      const rowLines = scaledColumns.map((column) => {
+        const value = String(row[column.key] ?? '');
+        return doc.splitTextToSize(value, Math.max(5, column.width - 3));
+      });
+
+      const lineCount = Math.max(...rowLines.map((lines) => lines.length), 1);
+      const rowHeight = Math.max(7, lineCount * 3.8 + 2);
+
+      if (currentY + rowHeight > pageHeight - 10) {
+        doc.addPage();
+        currentY = 12;
+        currentY = renderHeader(currentY);
+      }
+
+      let x = leftMargin;
+      scaledColumns.forEach((column, index) => {
+        doc.rect(x, currentY, column.width, rowHeight);
+        doc.text(rowLines[index], x + 1.5, currentY + 4.5, {
+          maxWidth: column.width - 3,
+          baseline: 'top'
+        });
+        x += column.width;
+      });
+
+      currentY += rowHeight;
+    });
+
+    doc.save(getSalesExportFilename('pdf'));
   };
 
   const handleCheckout = async () => {
@@ -409,7 +521,10 @@ const StallMenu = () => {
   // Helper functions for queue management
   const getPendingOrders = () => {
     return orders
-      .filter(o => o.status?.toLowerCase() === 'pending')
+      .filter((o) => {
+        if (o.status?.toLowerCase() !== 'pending') return false;
+        return !(String(o.paymentMethod || '').toLowerCase() === 'gcash' && String(o.paymentStatus || '').toLowerCase() === 'pending');
+      })
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   };
 
@@ -1137,7 +1252,13 @@ const StallMenu = () => {
                       <div className="col-span-2">{order.items?.map((item) => `${item.quantity}x ${item.name}`).join(', ') || 'N/A'}</div>
                       <div>
                         {order.historyType === 'cancelled'
-                          ? (order.cancellationReason === 'grace_period_expired' ? 'Grace period expired' : 'Manual cancel')
+                          ? (
+                            order.cancellationReason === 'payment_rejected'
+                              ? 'Payment rejected'
+                              : order.cancellationReason === 'grace_period_expired'
+                                ? 'Grace period expired'
+                                : 'Manual cancel'
+                          )
                           : '-'}
                       </div>
                       <div>{order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A'}</div>
@@ -1187,12 +1308,18 @@ const StallMenu = () => {
               </div>
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-6 gap-3">
               <button
-                onClick={handleExportSales}
+                onClick={handleExportSalesCSV}
                 className="px-4 py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-100"
               >
-                Export Data
+                Export CSV
+              </button>
+              <button
+                onClick={handleExportSalesPDF}
+                className="px-4 py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Export PDF
               </button>
             </div>
           </div>

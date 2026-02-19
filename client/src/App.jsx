@@ -6,6 +6,7 @@ import Auth from './pages/Auth';
 import Menu from './pages/Menu';
 import StallMenu from './pages/StallMenu';
 import MyOrders from './pages/MyOrders';
+import OrderHistory from './pages/OrderHistory';
 import Kitchen from './pages/Kitchen';
 import Profile from './pages/Profile';
 import Cart from './pages/Cart';
@@ -126,6 +127,14 @@ function App() {
               element={
                 <PrivateRoute role="customer">
                   <MyOrders />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/order-history" 
+              element={
+                <PrivateRoute role="customer">
+                  <OrderHistory />
                 </PrivateRoute>
               } 
             />

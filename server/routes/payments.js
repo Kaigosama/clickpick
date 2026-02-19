@@ -359,7 +359,8 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
         }
 
         order.status = 'cancelled';
-        order.cancellationReason = 'manual_cancel';
+        order.paymentStatus = 'rejected';
+        order.cancellationReason = 'payment_rejected';
         order.refundRequired = false;
         order.refundStatus = 'not_required';
         order.gracePeriodExpiresAt = undefined;
