@@ -934,8 +934,9 @@ const StallMenu = () => {
                     <div key={payment._id} className="bg-white bg-opacity-95 rounded-lg p-4 text-gray-900 border-2 border-orange-400">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="text-xs text-gray-600 mb-1">Queue Number</p>
-                          <p className="text-lg font-bold text-orange-600">#{payment.orderDbId?.queueNumber || 'N/A'}</p>
+                          <p className="text-xs text-gray-600 mb-1">Order Number</p>
+                          <p className="text-lg font-bold text-orange-600">#{payment.orderDbId?.orderNumber || payment.orderDbId?._id || 'N/A'}</p>
+                          <p className="text-xs text-gray-600 mt-1">Queue #{payment.orderDbId?.queueNumber || 'N/A'} (Store Queue)</p>
                         </div>
                         <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">
                           PENDING
@@ -943,6 +944,9 @@ const StallMenu = () => {
                       </div>
 
                       <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                        <p className="text-xs mb-1 text-gray-500">
+                          <strong>Order Ref:</strong> {payment.orderDbId?._id || 'N/A'}
+                        </p>
                         <p className="text-xs mb-1 text-gray-500">
                           <strong>Payment Ref:</strong> {payment._id}
                         </p>

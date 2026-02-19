@@ -234,8 +234,9 @@ const Kitchen = () => {
               <div key={payment._id} style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '20px', borderRadius: '12px', color: '#333', border: '2px solid #ff9800' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
                   <div>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '0.85em', color: '#666' }}>Queue Number</p>
-                    <p style={{ margin: 0, fontSize: '1.2em', fontWeight: 'bold', color: '#ff9800' }}>#{payment.orderDbId?.queueNumber || 'N/A'}</p>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '0.85em', color: '#666' }}>Order Number</p>
+                    <p style={{ margin: 0, fontSize: '1.2em', fontWeight: 'bold', color: '#ff9800' }}>#{payment.orderDbId?.orderNumber || payment.orderDbId?._id || 'N/A'}</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8em', color: '#666' }}>Queue #{payment.orderDbId?.queueNumber || 'N/A'} (Store Queue)</p>
                   </div>
                   <span style={{ background: '#ffc107', color: '#333', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.85em' }}>
                     PENDING
@@ -243,6 +244,9 @@ const Kitchen = () => {
                 </div>
 
                 <div style={{ marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '0.8em', color: '#666' }}>
+                    <strong>Order Ref:</strong> {payment.orderDbId?._id || 'N/A'}
+                  </p>
                   <p style={{ margin: '0 0 5px 0', fontSize: '0.8em', color: '#666' }}>
                     <strong>Payment Ref:</strong> {payment._id}
                   </p>

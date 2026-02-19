@@ -446,7 +446,7 @@ router.get('/pending-payments', async (req, res) => {
       .sort({ createdAt: -1 });
 
     const finalPayments = payments.filter((payment) => {
-      if (!payment.orderDbId?.stallId) return true;
+      if (!payment.orderDbId?.stallId) return false;
       return String(payment.orderDbId.stallId) === String(effectiveStallId);
     });
 
