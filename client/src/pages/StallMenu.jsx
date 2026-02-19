@@ -825,11 +825,15 @@ const StallMenu = () => {
                         <p className="text-xs font-bold mb-2">Proof of Payment:</p>
                         {payment.proofOfPaymentUrl ? (
                           <div className="relative">
+                            {(() => {
+                              const proofImageUrl = toServerAssetUrl(payment.proofOfPaymentUrl);
+                              return (
+                                <>
                             <img 
-                              src={`http://localhost:5000${payment.proofOfPaymentUrl}`} 
+                              src={proofImageUrl} 
                               alt="Proof of Payment" 
                               className="w-full h-32 object-cover rounded-lg border-2 border-gray-300 cursor-pointer hover:opacity-90"
-                              onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                              onClick={() => setSelectedProof(proofImageUrl)}
                               onError={(e) => {
                                 console.error('Image load error:', e.target.src);
                                 e.target.style.display = 'none';
@@ -838,11 +842,14 @@ const StallMenu = () => {
                             />
                             <div style={{ display: 'none' }} className="text-red-600 text-xs">Image failed to load</div>
                             <button
-                              onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                              onClick={() => setSelectedProof(proofImageUrl)}
                               className="absolute top-1 right-1 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs hover:bg-opacity-90"
                             >
                               🔍 View
                             </button>
+                                </>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <p className="text-gray-400 text-xs">No image uploaded</p>

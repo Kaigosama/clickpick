@@ -328,6 +328,10 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
       return res.status(403).json({ message: 'You can only reject payments for your own store' });
     }
 
+    if (String(existingPayment.status || '').toLowerCase() !== 'pending') {
+      return res.status(400).json({ message: 'Only pending payments can be rejected' });
+    }
+
     const payment = await Payment.findByIdAndUpdate(
       paymentId,
       {
@@ -343,6 +347,26 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
 
     if (payment.orderDbId) {
       const order = await Order.findById(payment.orderDbId);
+
+      if (order && String(order.status || '').toLowerCase() !== 'cancelled') {
+        for (const item of order.items || []) {
+          if (!item?.menuItemId || !Number(item?.quantity || 0)) continue;
+
+          await MenuItem.findByIdAndUpdate(item.menuItemId, {
+            $inc: { quantity: Number(item.quantity || 0) },
+            $set: { isAvailable: true }
+          });
+        }
+
+        order.status = 'cancelled';
+        order.cancellationReason = 'manual_cancel';
+        order.refundRequired = false;
+        order.refundStatus = 'not_required';
+        order.gracePeriodExpiresAt = undefined;
+        order.readyAt = undefined;
+        await order.save();
+      }
+
       if (order?.customerId) {
         const customer = await User.findById(order.customerId);
         if (customer?.phone) {

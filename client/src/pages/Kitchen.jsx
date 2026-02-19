@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const Kitchen = () => {
   const [items, setItems] = useState([]);
@@ -277,11 +278,15 @@ const Kitchen = () => {
                   <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', fontSize: '0.9em' }}>Proof of Payment:</p>
                   {payment.proofOfPaymentUrl ? (
                     <div style={{ position: 'relative' }}>
+                      {(() => {
+                        const proofImageUrl = toServerAssetUrl(payment.proofOfPaymentUrl);
+                        return (
+                          <>
                       <p style={{ fontSize: '0.75em', color: '#666', marginBottom: '5px' }}>
                         Path: {payment.proofOfPaymentUrl}
                       </p>
                       <img 
-                        src={`http://localhost:5000${payment.proofOfPaymentUrl}`} 
+                        src={proofImageUrl} 
                         alt="Proof of Payment" 
                         style={{ 
                           width: '100%', 
@@ -291,14 +296,14 @@ const Kitchen = () => {
                           cursor: 'pointer',
                           border: '2px solid #ddd'
                         }}
-                        onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                        onClick={() => setSelectedProof(proofImageUrl)}
                         onError={(e) => {
                           console.error('Image load error:', e.target.src);
                           e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="10" y="100" fill="red">Failed to load image</text></svg>';
                         }}
                       />
                       <button
-                        onClick={() => setSelectedProof(`http://localhost:5000${payment.proofOfPaymentUrl}`)}
+                        onClick={() => setSelectedProof(proofImageUrl)}
                         style={{
                           position: 'absolute',
                           top: '25px',
@@ -314,6 +319,9 @@ const Kitchen = () => {
                       >
                         🔍 View Full
                       </button>
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <p style={{ color: '#999', fontSize: '0.9em' }}>No image uploaded</p>
