@@ -38,6 +38,19 @@ const Checkout = () => {
     fetchStalls();
   }, []);
 
+  const hasConfiguredGcashNumber = (stall) => Boolean(String(stall?.gcashNumber || '').trim());
+
+  const gcashAvailableForCart = Object.keys(groupedByStore).every((storeId) => {
+    const stall = stalls.find((s) => s._id === storeId);
+    return hasConfiguredGcashNumber(stall);
+  });
+
+  useEffect(() => {
+    if (!gcashAvailableForCart && paymentMethod === 'gcash') {
+      setPaymentMethod('cash');
+    }
+  }, [gcashAvailableForCart, paymentMethod]);
+
   const resolveStall = (storeId) => {
     const match = stalls.find((s) => s._id === storeId);
     if (!match) {
@@ -72,9 +85,23 @@ const Checkout = () => {
       return;
     }
 
+    const storeIdsInCart = Object.keys(groupedByStore);
+    if (storeIdsInCart.length > 1) {
+      alert('Please place separate orders per store. Your cart currently has items from multiple stores.');
+      return;
+    }
+
     // If GCash is selected, redirect to payment verification
     if (paymentMethod === 'gcash') {
-      navigate('/gcash-payment');
+      if (!gcashAvailableForCart) {
+        alert('GCash is not available for one or more selected stores.');
+        setPaymentMethod('cash');
+        return;
+      }
+
+      const firstCartItem = cartItems[0];
+      const selectedStallId = firstCartItem?.stallId || firstCartItem?.stall || null;
+      navigate('/gcash-payment', { state: { stallId: selectedStallId } });
       return;
     }
 
@@ -86,6 +113,8 @@ const Checkout = () => {
         items: cartItems.map(item => ({
           menuItemId: item._id,
           name: item.name,
+          variation: item.selectedVariation || '',
+          riceOption: item.selectedRiceOption || '',
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -193,7 +222,7 @@ const Checkout = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -201,7 +230,7 @@ const Checkout = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -261,7 +290,7 @@ const Checkout = () => {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-b-4 border-[#8B0000]">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/basket')}
@@ -269,7 +298,7 @@ const Checkout = () => {
             >
               ← Back
             </button>
-            <h1 className="text-4xl font-bold text-gray-900">Checkout</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">Checkout</h1>
           </div>
         </div>
 
@@ -314,6 +343,9 @@ const Checkout = () => {
                         <div key={idx} className="flex items-start justify-between py-3 border-b border-gray-200 last:border-0">
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">{item.name}</p>
+                            {item.riceOptionLabel && (
+                              <p className="text-xs text-gray-600">Rice: {item.riceOptionLabel}</p>
+                            )}
                             <p className="text-sm text-gray-600">₱{item.price}</p>
                           </div>
                           <div className="text-right">
@@ -358,8 +390,13 @@ const Checkout = () => {
                     className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
                   >
                     <option value="cash">CASH</option>
-                    <option value="gcash">GCASH</option>
+                    {gcashAvailableForCart && <option value="gcash">GCASH</option>}
                   </select>
+                  {!gcashAvailableForCart && (
+                    <p className="mt-2 text-xs text-amber-700 font-semibold">
+                      GCash is unavailable
+                    </p>
+                  )}
                 </div>
 
                 {/* Estimated Time */}

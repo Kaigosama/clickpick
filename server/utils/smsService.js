@@ -8,33 +8,36 @@ const TEXTBEE_BASE_URL = 'https://api.textbee.dev/api/v1';
 
 const isTextBeeConfigured = TEXTBEE_API_KEY && TEXTBEE_DEVICE_ID;
 
-const buildStatusMessage = (status, queueNumber) => {
+const buildStatusMessage = (status, queueNumber, storeName) => {
+  const normalizedStoreName = String(storeName || '').trim();
+  const storeSuffix = normalizedStoreName ? ` from ${normalizedStoreName}` : '';
+
   switch (status) {
     case 'pending':
-      return `ClickPick: Order #${queueNumber} has been received.`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} has been received.`;
     case 'preparing':
-      return `ClickPick: Order #${queueNumber} is now being prepared.`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} is now being prepared.`;
     case 'ready':
-      return `ClickPick: Your Order #${queueNumber} is READY for pickup!`;
+      return `ClickPick: Your Order #${queueNumber}${storeSuffix} is READY for pickup!`;
     case 'completed':
-      return `ClickPick: Order #${queueNumber} has been completed. Thank you!`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} has been completed. Thank you!`;
     case 'cancelled':
-      return `ClickPick: Order #${queueNumber} was cancelled.`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} was cancelled.`;
     case 'approved':
-      return `ClickPick: Payment for Order #${queueNumber} has been approved.`;
+      return `ClickPick: Payment for Order #${queueNumber}${storeSuffix} has been approved.`;
     case 'rejected':
-      return `ClickPick: Payment for Order #${queueNumber} was rejected.`;
+      return `ClickPick: Payment for Order #${queueNumber}${storeSuffix} was rejected.`;
     case 'refund_pending':
-      return `ClickPick: Order #${queueNumber} was not claimed within 15 minutes and is now cancelled. Please wait for your GCash refund from the canteen staff.`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} was not claimed within 15 minutes and is now cancelled. Please wait for your GCash refund from the canteen staff.`;
     case 'refund_sent':
-      return `ClickPick: Refund for Order #${queueNumber} has been sent via GCash by the canteen staff.`;
+      return `ClickPick: Refund for Order #${queueNumber}${storeSuffix} has been sent via GCash by the canteen staff.`;
     default:
-      return `ClickPick: Order #${queueNumber} status updated to ${status}.`;
+      return `ClickPick: Order #${queueNumber}${storeSuffix} status updated to ${status}.`;
   }
 };
 
-const sendStatusSMS = async (phoneNumber, queueNumber, status) => {
-  const messageBody = buildStatusMessage(status, queueNumber);
+const sendStatusSMS = async (phoneNumber, queueNumber, status, storeName = '') => {
+  const messageBody = buildStatusMessage(status, queueNumber, storeName);
   console.log(`📨 SMS trigger: ${phoneNumber} | Order #${queueNumber} | Status: ${status}`);
 
   if (isTextBeeConfigured) {

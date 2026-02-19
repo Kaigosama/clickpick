@@ -7,14 +7,21 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
 
+  const getCartItemKey = (itemOrId, selectedVariation = '') => {
+    if (typeof itemOrId === 'object' && itemOrId !== null) {
+      return `${itemOrId._id}::${itemOrId.selectedVariation || ''}::${itemOrId.selectedRiceOption || ''}`;
+    }
+    return `${itemOrId}::${selectedVariation || ''}`;
+  };
+
   // Add item to cart
   const addToCart = (item) => {
     setCartItems((prevItems) => {
-      // Check if item already exists in cart to update quantity instead of adding duplicate
-      const existingItem = prevItems.find((i) => i._id === item._id);
+      const cartItemKey = getCartItemKey(item);
+      const existingItem = prevItems.find((i) => getCartItemKey(i) === cartItemKey);
       if (existingItem) {
         return prevItems.map((i) =>
-          i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i
+          getCartItemKey(i) === cartItemKey ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
       return [...prevItems, { ...item, quantity: 1 }];
@@ -22,24 +29,27 @@ export const CartProvider = ({ children }) => {
   };
 
   // Remove item from cart
-  const removeFromCart = (itemId) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item._id !== itemId));
+  const removeFromCart = (itemOrId, selectedVariation = '') => {
+    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
+    setCartItems((prevItems) => prevItems.filter((item) => getCartItemKey(item) !== cartItemKey));
   };
 
   // Decrease quantity or remove if 0
-  const decreaseQuantity = (itemId) => {
+  const decreaseQuantity = (itemOrId, selectedVariation = '') => {
+    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
     setCartItems((prevItems) => 
       prevItems.map(item => 
-        item._id === itemId ? { ...item, quantity: item.quantity - 1 } : item
+        getCartItemKey(item) === cartItemKey ? { ...item, quantity: item.quantity - 1 } : item
       ).filter(item => item.quantity > 0)
     );
   };
 
   // Increase quantity
-  const increaseQuantity = (itemId) => {
+  const increaseQuantity = (itemOrId, selectedVariation = '') => {
+    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
     setCartItems((prevItems) =>
       prevItems.map(item =>
-        item._id === itemId ? { ...item, quantity: item.quantity + 1 } : item
+        getCartItemKey(item) === cartItemKey ? { ...item, quantity: item.quantity + 1 } : item
       )
     );
   };

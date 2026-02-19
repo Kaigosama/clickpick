@@ -14,13 +14,32 @@ const GCashPayment = () => {
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [uploaded, setUploaded] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [orderId, setOrderId] = useState('');
+  const [gcashNumber, setGcashNumber] = useState('Not available');
 
-  // Generate Order ID on mount
   useEffect(() => {
-    const id = Math.floor(1000000 + Math.random() * 9000000).toString();
-    setOrderId(id);
-  }, []);
+    const fetchGcashNumber = async () => {
+      try {
+        const res = await api.get('/auth/stalls');
+        const list = Array.isArray(res.data) ? res.data : res.data?.stalls || [];
+
+        const firstCartItem = cartItems[0];
+        const targetStallId = location.state?.stallId || firstCartItem?.stallId || firstCartItem?.stall;
+        const stall = list.find((entry) => String(entry._id) === String(targetStallId));
+
+        if (stall?.gcashNumber && String(stall.gcashNumber).trim()) {
+          setGcashNumber(String(stall.gcashNumber).trim());
+          return;
+        }
+
+        setGcashNumber('Not available');
+      } catch (err) {
+        console.error('Error fetching stalls for GCash number:', err);
+        setGcashNumber('Not available');
+      }
+    };
+
+    fetchGcashNumber();
+  }, [cartItems, location.state]);
 
   // Countdown timer
   useEffect(() => {
@@ -59,7 +78,6 @@ const GCashPayment = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('orderId', orderId);
       formData.append('customerId', user._id);
       formData.append('amount', cartTotal);
       formData.append('totalAmount', cartTotal);
@@ -68,6 +86,8 @@ const GCashPayment = () => {
       const orderItems = cartItems.map(item => ({
         menuItemId: item._id,
         name: item.name,
+        variation: item.selectedVariation || '',
+        riceOption: item.selectedRiceOption || '',
         quantity: item.quantity || 1,
         price: item.price
       }));
@@ -86,7 +106,12 @@ const GCashPayment = () => {
       
       // Wait for store approval (you can implement polling here)
       // For now, navigate to waiting page
-      navigate('/payment-waiting', { state: { orderId: orderId } });
+      navigate('/payment-waiting', {
+        state: {
+          orderId: response.data?.orderId,
+          orderDbId: response.data?.orderDbId
+        }
+      });
     } catch (err) {
       console.error(err);
       alert('Upload failed: ' + (err.response?.data?.message || err.message));
@@ -106,7 +131,7 @@ const GCashPayment = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -114,7 +139,7 @@ const GCashPayment = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -174,7 +199,7 @@ const GCashPayment = () => {
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-b-4 border-[#8B0000]">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/checkout')}
@@ -182,7 +207,7 @@ const GCashPayment = () => {
             >
               ← Back
             </button>
-            <h1 className="text-4xl font-bold text-gray-900">GCash Payment Verification</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">GCash Payment Verification</h1>
           </div>
         </div>
 
@@ -198,7 +223,7 @@ const GCashPayment = () => {
           {/* GCash Number */}
           <div className="bg-gradient-to-r from-[#8B0000] to-red-700 text-white p-6 rounded-lg shadow-lg">
             <p className="text-sm font-semibold mb-2">Send payment to</p>
-            <p className="text-3xl font-bold tracking-wider">09123456789</p>
+            <p className="text-3xl font-bold tracking-wider">{gcashNumber}</p>
             <p className="text-sm mt-3 opacity-90">Amount: ₱{cartTotal.toFixed(2)}</p>
           </div>
 

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext.jsx';
+import api from '../services/api.js';
 
 const Kitchen = () => {
   const [items, setItems] = useState([]);
@@ -14,9 +16,11 @@ const Kitchen = () => {
   const [refundNotes, setRefundNotes] = useState({});
   const [nowTs, setNowTs] = useState(Date.now());
   const navigate = useNavigate();
+  const { user, logout, loading } = useContext(AuthContext);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    if (loading) return;
+
     if (!user || user.role !== 'stall_staff') {
       alert("Access Denied: Staff Only");
       navigate('/auth');
@@ -26,7 +30,7 @@ const Kitchen = () => {
       fetchOrders();
       fetchPendingPayments();
     }
-  }, [navigate]);
+  }, [navigate, user, loading]);
 
   // Poll for new orders and pending payments every 5 seconds
   useEffect(() => {
@@ -46,13 +50,13 @@ const Kitchen = () => {
   }, []);
 
   const fetchItems = async () => {
-    const res = await axios.get('http://localhost:5000/api/menu');
+    const res = await axios.get(`http://localhost:5000/api/menu?stall=${user?._id || ''}`);
     setItems(res.data);
   };
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/orders');
+      const res = await api.get(`/orders?stallId=${user?._id || ''}`);
       setOrders(res.data);
     } catch (err) {
       console.error("Error fetching orders", err);
@@ -61,7 +65,7 @@ const Kitchen = () => {
 
   const fetchPendingPayments = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/payments/pending-payments');
+      const res = await api.get(`/payments/pending-payments?stallId=${user?._id || ''}`);
       console.log('Pending payments response:', res.data);
       console.log('Payments array:', res.data.payments);
       setPendingPayments(res.data.payments || []);
@@ -72,9 +76,8 @@ const Kitchen = () => {
 
   const approvePayment = async (paymentId) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      await axios.post(`http://localhost:5000/api/payments/gcash-approve/${paymentId}`, {
-        stallId: user._id
+      await api.post(`/payments/gcash-approve/${paymentId}`, {
+        stallId: user?._id
       });
       alert("Payment approved successfully!");
       fetchPendingPayments();
@@ -89,8 +92,9 @@ const Kitchen = () => {
     if (!reason) return;
 
     try {
-      await axios.post(`http://localhost:5000/api/payments/gcash-reject/${paymentId}`, {
-        reason: reason
+      await api.post(`/payments/gcash-reject/${paymentId}`, {
+        reason: reason,
+        stallId: user?._id
       });
       alert("Payment rejected");
       fetchPendingPayments();
@@ -101,7 +105,7 @@ const Kitchen = () => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}`, { status: newStatus });
+      await api.put(`/orders/${orderId}`, { status: newStatus });
       fetchOrders(); 
     } catch (err) {
       alert("Failed to update status");
@@ -116,13 +120,12 @@ const Kitchen = () => {
     }
 
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
       const formData = new FormData();
       formData.append('refundProof', selectedFile);
       formData.append('note', refundNotes[orderId] || '');
       formData.append('staffId', user?._id || '');
 
-      await axios.post(`http://localhost:5000/api/orders/${orderId}/refund-proof`, formData, {
+      await api.post(`/orders/${orderId}/refund-proof`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -146,7 +149,7 @@ const Kitchen = () => {
 
   const generateReport = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/orders/report/daily');
+      const res = await api.get(`/orders/report/daily?stallId=${user?._id || ''}`);
       setReport(res.data);
     } catch (err) {
       alert("Failed to generate report. Make sure you have completed orders today!");
@@ -205,10 +208,10 @@ const Kitchen = () => {
   };
 
   return (
-    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '30px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '30px', maxWidth: '1400px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
         <h1>👨‍🍳 Kitchen Dashboard</h1>
-        <button onClick={() => { localStorage.clear(); navigate('/auth'); }} style={{background: 'red', color: 'white', padding: '10px'}}>Logout</button>
+        <button onClick={logout} style={{background: 'red', color: 'white', padding: '10px'}}>Logout</button>
       </div>
 
       {/* DEBUG SECTION - ALWAYS VISIBLE */}
@@ -244,7 +247,7 @@ const Kitchen = () => {
             )}
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
             {pendingPayments.map(payment => (
               <div key={payment._id} style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '20px', borderRadius: '12px', color: '#333', border: '2px solid #ff9800' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
@@ -518,7 +521,7 @@ const Kitchen = () => {
             {getPendingOrders().length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '1.3em', color: '#ffc107', margin: '15px 0 10px 0' }}>⏳ Pending Orders</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                   {getPendingOrders().map(order => (
                     <div key={order._id} style={{ padding: '15px', background: 'rgba(255, 193, 7, 0.15)', border: '2px solid #ffc107', borderRadius: '8px', color: 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -563,7 +566,7 @@ const Kitchen = () => {
             {getPreparingOrders().length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '1.3em', color: '#ff9800', margin: '15px 0 10px 0' }}>👨‍🍳 Preparing Orders</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                   {getPreparingOrders().map(order => (
                     <div key={order._id} style={{ padding: '15px', background: 'rgba(255, 152, 0, 0.15)', border: '2px solid #ff9800', borderRadius: '8px', color: 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -609,7 +612,7 @@ const Kitchen = () => {
             {getReadyOrders().length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '1.3em', color: '#4caf50', margin: '15px 0 10px 0' }}>✅ Ready Orders (Awaiting Pickup)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                   {getReadyOrders().map(order => (
                     <div key={order._id} style={{ padding: '15px', background: 'rgba(76, 175, 80, 0.15)', border: '2px solid #4caf50', borderRadius: '8px', color: 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -662,7 +665,7 @@ const Kitchen = () => {
             {getRefundRequiredOrders().length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '1.3em', color: '#ff5252', margin: '15px 0 10px 0' }}>💸 Manual GCash Refund Required</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                   {getRefundRequiredOrders().map(order => (
                     <div key={order._id} style={{ padding: '15px', background: 'rgba(244, 67, 54, 0.2)', border: '2px solid #ff5252', borderRadius: '8px', color: 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -728,7 +731,7 @@ const Kitchen = () => {
       {/* SECTION 2: MENU MANAGEMENT */}
       <div style={{ borderTop: '2px solid #eee', paddingTop: '20px' }}>
         <h3>Add New Menu Item</h3>
-        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <input placeholder="Name" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} required />
           <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} required />
           <button type="submit">Add</button>

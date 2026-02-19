@@ -64,6 +64,8 @@ const Menu = () => {
         items: cartItems.map(item => ({
           menuItemId: item._id,
           name: item.name,
+          variation: item.selectedVariation || '',
+          riceOption: item.selectedRiceOption || '',
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -85,7 +87,7 @@ const Menu = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -93,7 +95,7 @@ const Menu = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button onClick={() => {}} className="hover:opacity-80 font-semibold text-lg">
               STORES
             </button>
@@ -110,7 +112,7 @@ const Menu = () => {
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
               >
                 <div className="w-8 h-8 bg-white rounded-full" />
-                <div className="flex items-center gap-1">
+                <div className="hidden sm:flex items-center gap-1">
                   <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
                   <p className="text-xs">▼</p>
                 </div>
@@ -145,8 +147,8 @@ const Menu = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Available Canteen Stalls</h1>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">Available Canteen Stalls</h1>
         <p className="text-gray-600 mb-8">Select a stall to view their menu items</p>
 
         {/* Stalls Grid */}
@@ -186,12 +188,12 @@ const Menu = () => {
       </main>
 
       {/* Floating Basket Button - Bottom Right */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         <button
           onClick={() => navigate('/cart')}
           onMouseEnter={() => setShowCartPreview(true)}
           onMouseLeave={() => setShowCartPreview(false)}
-          className="bg-[#8B0000] text-white w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold hover:bg-red-800 transition-all shadow-lg hover:shadow-xl"
+          className="bg-[#8B0000] text-white w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold hover:bg-red-800 transition-all shadow-lg hover:shadow-xl"
           title="View Basket"
         >
           🛒

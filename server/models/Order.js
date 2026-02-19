@@ -6,6 +6,8 @@ const OrderSchema = new mongoose.Schema({
     {
       menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' },
       name: { type: String },
+      variation: { type: String, default: '' },
+      riceOption: { type: String, enum: ['no_rice', 'with_rice', ''], default: '' },
       quantity: { type: Number, required: true },
       price: { type: Number, required: true }
     }

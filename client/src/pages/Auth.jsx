@@ -72,6 +72,11 @@ const Auth = () => {
       const res = await api.post(endpoint, payload, config);
 
       if (isLogin) {
+        if (selectedRole && res.data.user.role !== selectedRole) {
+          alert(`This account is not a ${selectedRole === 'stall_staff' ? 'canteen staff' : 'customer'} account.`);
+          return;
+        }
+
         // 3. Update Global State
         // The API returns { token, user: { name, role, ... } }
         login(res.data.user, res.data.token);
@@ -112,15 +117,15 @@ const Auth = () => {
       <div className="absolute inset-0 z-10 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
 
       {/* Content Container with Dark Background */}
-      <div className="relative z-20 w-full max-w-md mx-auto px-10 lg:px-16 py-12 flex flex-col items-center justify-center text-center bg-black/40 backdrop-blur-md rounded-lg shadow-2xl border border-white/10">
+      <div className="relative z-20 w-full max-w-md mx-auto px-5 sm:px-8 lg:px-16 py-8 sm:py-12 flex flex-col items-center justify-center text-center bg-black/40 backdrop-blur-md rounded-lg shadow-2xl border border-white/10">
         
         {/* Branding Area */}
         <div className="flex flex-col items-center mb-12">
-          <div className="w-24 h-24 mb-4 flex items-center justify-center shadow-2xl">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 flex items-center justify-center shadow-2xl">
             <img src="/logo.png" alt="ClickPick Logo" className="w-full h-full object-contain" />
           </div>
           <div>
-            <h1 className="text-5xl font-bold text-white tracking-tighter leading-none">ClickPick</h1>
+            <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tighter leading-none">ClickPick</h1>
             <p className="text-[10px] text-gray-400 uppercase tracking-[0.25em] mt-2 font-medium">
               Centralized Canteen Pre-Order System
             </p>

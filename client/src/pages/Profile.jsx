@@ -10,7 +10,9 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    password: '',
+    confirmPassword: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -26,7 +28,9 @@ const Profile = () => {
     setFormData({
       name: user.name || '',
       email: user.email || '',
-      phone: user.phone || ''
+      phone: user.phone || '',
+      password: '',
+      confirmPassword: ''
     });
     if (user.logoUrl) {
       const url = user.logoUrl.startsWith('http') ? user.logoUrl : `http://localhost:5000${user.logoUrl}`;
@@ -47,12 +51,21 @@ const Profile = () => {
     setLoading(true);
     setMessage('');
 
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      setMessage('Error updating profile: Passwords do not match.');
+      setLoading(false);
+      return;
+    }
+
     try {
       let response = null;
       if (isStaff && logoFile) {
         const formDataPayload = new FormData();
         formDataPayload.append('userId', user._id);
         formDataPayload.append('name', formData.name);
+        if (formData.password) {
+          formDataPayload.append('password', formData.password);
+        }
         formDataPayload.append('logo', logoFile);
         response = await api.put('/auth/profile', formDataPayload, {
           headers: { 'Content-Type': 'multipart/form-data' }
@@ -62,8 +75,10 @@ const Profile = () => {
           userId: user._id,
           name: formData.name
         };
+        if (formData.password) {
+          payload.password = formData.password;
+        }
         if (!isStaff) {
-          payload.email = formData.email;
           payload.phone = formData.phone;
         }
 
@@ -100,7 +115,7 @@ const Profile = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header className="bg-[#8B0000] text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
             <span className="text-xl font-bold">{isStaff ? 'ClickPick Canteen Dashboard' : 'ClickPick'}</span>
@@ -122,9 +137,9 @@ const Profile = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">
             {isStaff ? 'Edit Store Profile' : 'My Profile'}
           </h1>
           <p className="text-gray-600 mb-8">
@@ -153,23 +168,23 @@ const Profile = () => {
               />
             </div>
 
+            {/* Email (read-only) */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                readOnly
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">Email cannot be changed.</p>
+            </div>
+
             {!isStaff && (
               <>
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
-                    required
-                  />
-                </div>
-
                 {/* Phone */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
@@ -185,6 +200,35 @@ const Profile = () => {
                 </div>
               </>
             )}
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                New Password (Optional)
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                placeholder="Re-enter new password"
+              />
+            </div>
 
             {isStaff && (
               <div>

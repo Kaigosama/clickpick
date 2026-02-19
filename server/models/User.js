@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
     default: 'customer' 
   },
   phone: { type: String },
+  gcashNumber: { type: String },
   logoUrl: { type: String },
   logoPath: { type: String }
 }, { timestamps: true });

@@ -17,7 +17,10 @@ const CartPreview = ({ cartItems, cartTotal, onCheckoutClick }) => {
   };
 
   return (
-    <div className="absolute bottom-20 right-0 w-80 bg-white rounded-lg shadow-2xl border-4 border-[#8B0000] z-50 max-h-96 overflow-hidden flex flex-col">
+    <div
+      className="absolute bottom-20 right-0 bg-white rounded-lg shadow-2xl border-4 border-[#8B0000] z-50 max-h-96 overflow-hidden flex flex-col"
+      style={{ width: 'min(20rem, calc(100vw - 1rem))' }}
+    >
       <div className="p-4 bg-[#8B0000] text-white flex items-center justify-between">
         <h2 className="text-xl font-bold">🛒 My Basket</h2>
       </div>
@@ -33,7 +36,11 @@ const CartPreview = ({ cartItems, cartTotal, onCheckoutClick }) => {
                 <p className="text-xs font-bold text-[#8B0000] mb-1">{stalls[storeId]}</p>
                 {items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-xs bg-white p-2 rounded border border-gray-200">
-                    <span className="text-gray-700">{item.name}</span>
+                    <span className="text-gray-700">
+                      {item.name}
+                      {item.selectedVariation ? ` (${item.selectedVariation})` : ''}
+                      {item.riceOptionLabel ? ` - ${item.riceOptionLabel}` : ''}
+                    </span>
                     <span className="text-gray-600">₱{(item.price * (item.quantity || 1)).toFixed(2)}</span>
                   </div>
                 ))}

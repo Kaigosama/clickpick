@@ -19,24 +19,27 @@ const AuthOrDashboard = () => {
 };
 
 const ProfileRedirect = () => {
-  const storedUser = localStorage.getItem('user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    if (user.role === 'stall_staff') {
-      return <Navigate to="/store-profile" replace />;
-    }
+  const { user, loading } = useContext(AuthContext);
+
+  if (loading) return null;
+
+  if (user?.role === 'stall_staff') {
+    return <Navigate to="/store-profile" replace />;
   }
+
   return <Profile />;
 };
 
 // Simple protection to ensure only logged-in users access internal pages
 const PrivateRoute = ({ children, role }) => {
+  const { user, loading } = useContext(AuthContext);
   const token = localStorage.getItem('token');
-  const storedUser = localStorage.getItem('user');
 
-  if (!token) return <Navigate to="/" replace />;
-  if (role && storedUser) {
-    const user = JSON.parse(storedUser);
+  if (loading) return null;
+
+  if (!token || !user) return <Navigate to="/" replace />;
+
+  if (role) {
     // allow role to be string or array of strings
     if (Array.isArray(role)) {
       if (!role.includes(user.role)) {
@@ -74,6 +77,7 @@ function App() {
           <Routes>
             {/* Public Route: Login/Register - Auto-redirects if already logged in */}
             <Route path="/" element={<AuthOrDashboard />} />
+            <Route path="/auth" element={<AuthOrDashboard />} />
 
             {/* Customer Routes - Only accessible by customers */}
             <Route 

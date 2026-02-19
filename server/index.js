@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
@@ -10,9 +11,11 @@ const menuRoute = require('./routes/menu');
 const orderRoute = require('./routes/orders');
 const paymentsRoute = require('./routes/payments');
 const { processExpiredReadyOrders } = require('./utils/orderGraceService');
+const { setSocketServer } = require('./socket');
 
 dotenv.config();
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -32,6 +35,8 @@ app.use('/api/menu', menuRoute);
 app.use('/api/orders', orderRoute);
 app.use('/api/payments', paymentsRoute);
 
+setSocketServer(server);
+
 setInterval(async () => {
   try {
     const { processedCount } = await processExpiredReadyOrders();
@@ -43,6 +48,6 @@ setInterval(async () => {
   }
 }, 60 * 1000);
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

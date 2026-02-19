@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -8,6 +9,23 @@ const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
 const { sendStatusSMS } = require('../utils/smsService');
+
+const getRequesterFromToken = async (req) => {
+  const authHeader = req.headers.authorization || '';
+  const [scheme, token] = authHeader.split(' ');
+
+  if (!token || String(scheme || '').toLowerCase() !== 'bearer') {
+    return null;
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'your_secret_key_here');
+    const user = await User.findById(payload.id).select('_id role');
+    return user || null;
+  } catch (err) {
+    return null;
+  }
+};
 
 // Function to calculate estimated preparation time
 const calculateEstimatedTime = async (items, queuePosition) => {
@@ -71,14 +89,43 @@ const upload = multer({
 // Upload GCash proof of payment
 router.post('/gcash-upload', upload.single('file'), async (req, res) => {
   try {
-    const { orderId, customerId, items, totalAmount } = req.body;
+    const { customerId, items, totalAmount } = req.body;
 
-    if (!req.file || !orderId || !customerId) {
+    if (!req.file || !customerId) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
     // Parse items if it's a string
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+
+    const menuItemIds = (parsedItems || [])
+      .map((item) => item?.menuItemId)
+      .filter(Boolean);
+
+    if (!menuItemIds.length) {
+      return res.status(400).json({ message: 'Order must include valid menu items' });
+    }
+
+    const menuItems = await MenuItem.find({ _id: { $in: menuItemIds } }).select('stallId');
+    const stallIds = Array.from(
+      new Set(
+        menuItems
+          .map((menuItem) => String(menuItem?.stallId || ''))
+          .filter(Boolean)
+      )
+    );
+
+    if (!stallIds.length) {
+      return res.status(400).json({ message: 'Unable to resolve store for this order' });
+    }
+
+    if (stallIds.length > 1) {
+      return res.status(400).json({ message: 'Please place separate orders per store' });
+    }
+
+    const [resolvedStallId] = stallIds;
+    const store = await User.findById(resolvedStallId).select('name');
+    const storeName = store?.name || 'Store';
 
     // Create the order first with payment pending
     const count = await Order.countDocuments();
@@ -94,16 +141,18 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       paymentMethod: 'gcash',
       paymentStatus: 'pending', // Payment pending approval
       status: 'pending', // Order status
+      stallId: resolvedStallId,
       queueNumber: queueNumber,
       estimatedTime: estimatedTime
     });
 
     const savedOrder = await newOrder.save();
+    const stableOrderId = String(savedOrder._id);
 
     if (savedOrder?.customerId) {
       const customer = await User.findById(savedOrder.customerId);
       if (customer?.phone) {
-        await sendStatusSMS(customer.phone, savedOrder.queueNumber, 'pending');
+        await sendStatusSMS(customer.phone, savedOrder.queueNumber, 'pending', storeName);
       } else {
         console.log("⚠️ SMS skipped: Customer has no phone number saved.");
       }
@@ -129,7 +178,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
 
     // Create payment record
     const payment = new Payment({
-      orderId: orderId,
+      orderId: stableOrderId,
       orderDbId: savedOrder._id, // Reference to the actual Order document
       customerId: customerId,
       paymentMethod: 'gcash',
@@ -145,7 +194,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       success: true,
       message: 'Proof of payment uploaded successfully',
       paymentId: payment._id,
-      orderId: orderId,
+      orderId: stableOrderId,
       orderDbId: savedOrder._id
     });
   } catch (err) {
@@ -192,14 +241,32 @@ router.get('/gcash-status/:orderId', async (req, res) => {
 // Approve GCash payment (Staff only)
 router.post('/gcash-approve/:paymentId', async (req, res) => {
   try {
+    const requester = await getRequesterFromToken(req);
     const { paymentId } = req.params;
     const { stallId } = req.body;
+
+    const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : stallId;
+
+    if (!effectiveStallId) {
+      return res.status(400).json({ message: 'stallId is required' });
+    }
+
+    const existingPayment = await Payment.findById(paymentId).populate('orderDbId', 'stallId');
+
+    if (!existingPayment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    const paymentStallId = existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '';
+    if (!paymentStallId || paymentStallId !== String(effectiveStallId)) {
+      return res.status(403).json({ message: 'You can only approve payments for your own store' });
+    }
 
     const payment = await Payment.findByIdAndUpdate(
       paymentId,
       {
         status: 'approved',
-        approvedBy: stallId,
+        approvedBy: effectiveStallId,
         approvedAt: new Date()
       },
       { new: true }
@@ -219,7 +286,9 @@ router.post('/gcash-approve/:paymentId', async (req, res) => {
       if (updatedOrder?.customerId) {
         const customer = await User.findById(updatedOrder.customerId);
         if (customer?.phone) {
-          await sendStatusSMS(customer.phone, updatedOrder.queueNumber, 'approved');
+          const store = await User.findById(updatedOrder.stallId).select('name');
+          const storeName = store?.name || 'Store';
+          await sendStatusSMS(customer.phone, updatedOrder.queueNumber, 'approved', storeName);
         }
       }
     }
@@ -238,8 +307,26 @@ router.post('/gcash-approve/:paymentId', async (req, res) => {
 // Reject GCash payment (Staff only)
 router.post('/gcash-reject/:paymentId', async (req, res) => {
   try {
+    const requester = await getRequesterFromToken(req);
     const { paymentId } = req.params;
-    const { reason } = req.body;
+    const { reason, stallId } = req.body;
+
+    const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : stallId;
+
+    if (!effectiveStallId) {
+      return res.status(400).json({ message: 'stallId is required' });
+    }
+
+    const existingPayment = await Payment.findById(paymentId).populate('orderDbId', 'stallId');
+
+    if (!existingPayment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    const paymentStallId = existingPayment.orderDbId?.stallId ? String(existingPayment.orderDbId.stallId) : '';
+    if (!paymentStallId || paymentStallId !== String(effectiveStallId)) {
+      return res.status(403).json({ message: 'You can only reject payments for your own store' });
+    }
 
     const payment = await Payment.findByIdAndUpdate(
       paymentId,
@@ -259,7 +346,9 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
       if (order?.customerId) {
         const customer = await User.findById(order.customerId);
         if (customer?.phone) {
-          await sendStatusSMS(customer.phone, order.queueNumber, 'rejected');
+          const store = await User.findById(order.stallId).select('name');
+          const storeName = store?.name || 'Store';
+          await sendStatusSMS(customer.phone, order.queueNumber, 'rejected', storeName);
         }
       }
     }
@@ -278,17 +367,29 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
 // Get pending GCash payments
 router.get('/pending-payments', async (req, res) => {
   try {
+    const requester = await getRequesterFromToken(req);
+    const requestedStallId = req.query.stallId;
+    const effectiveStallId = requester?.role === 'stall_staff' ? String(requester._id) : requestedStallId;
+
     const payments = await Payment.find({
       status: 'pending'
     })
     .populate('customerId', 'name email phone')
-    .populate('orderDbId', 'queueNumber _id')
+    .populate({
+      path: 'orderDbId',
+      select: 'queueNumber _id stallId',
+      ...(effectiveStallId ? { match: { stallId: effectiveStallId } } : {})
+    })
     .sort({ createdAt: -1 });
+
+    const filteredPayments = effectiveStallId
+      ? payments.filter((payment) => payment.orderDbId)
+      : payments;
 
     res.json({
       success: true,
-      payments: payments,
-      count: payments.length
+      payments: filteredPayments,
+      count: filteredPayments.length
     });
   } catch (err) {
     console.error('Fetch pending error:', err);

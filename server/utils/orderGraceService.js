@@ -18,7 +18,9 @@ const processExpiredReadyOrders = async () => {
         updatedAt: { $lte: fallbackCutoff }
       }
     ]
-  }).populate('customerId', 'phone');
+  })
+    .populate('customerId', 'phone')
+    .populate('stallId', 'name');
 
   let processedCount = 0;
 
@@ -41,10 +43,12 @@ const processExpiredReadyOrders = async () => {
     }
 
     if (customerPhone) {
+      const storeName = order.stallId?.name || 'Store';
       await sendStatusSMS(
         customerPhone,
         order.queueNumber,
-        needsRefund ? 'refund_pending' : 'cancelled'
+        needsRefund ? 'refund_pending' : 'cancelled',
+        storeName
       );
     }
   }

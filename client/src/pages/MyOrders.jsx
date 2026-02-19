@@ -8,11 +8,22 @@ const MyOrders = () => {
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
   const { cartItems } = useCart();
+  const serverBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
   const [orders, setOrders] = useState([]);
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showQueue, setShowQueue] = useState(true);
+  const [cancellingOrderId, setCancellingOrderId] = useState('');
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!user) navigate('/');
@@ -56,30 +67,69 @@ const MyOrders = () => {
     navigate('/');
   };
 
+  const handleCancelOrder = async (order) => {
+    const currentStatus = String(order?.status || '').toLowerCase();
+
+    if (currentStatus === 'preparing') {
+      alert('This order is already preparing and can no longer be cancelled.');
+      return;
+    }
+
+    if (currentStatus !== 'pending') {
+      return;
+    }
+
+    const confirmed = window.confirm('Cancel this order?');
+    if (!confirmed) {
+      return;
+    }
+
+    setCancellingOrderId(order._id);
+    try {
+      const response = await api.put(`/orders/${order._id}`, { status: 'cancelled', cancellationReason: 'manual_cancel' });
+      const updated = response.data;
+
+      setOrders((prev) => prev.map((entry) => (entry._id === order._id ? { ...entry, ...updated } : entry)));
+      setAllOrders((prev) => prev.map((entry) => (entry._id === order._id ? { ...entry, ...updated } : entry)));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to cancel order');
+    } finally {
+      setCancellingOrderId('');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch(status?.toLowerCase()) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'preparing': return 'bg-blue-100 text-blue-800';
       case 'ready': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-gray-100 text-gray-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getQueuePosition = () => {
     if (!orders.length || !allOrders.length) return null;
-    
-    const userFirstOrder = orders[0]; // Get most recent order
+
+    const userActiveOrder = orders
+      .filter((order) => {
+        const status = order.status?.toLowerCase();
+        return status === 'pending' || status === 'preparing';
+      })
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+
+    if (!userActiveOrder) return null;
     
     // Filter pending and preparing orders only (in queue)
     const activeOrders = allOrders.filter(o => 
       (o.status?.toLowerCase() === 'pending' || o.status?.toLowerCase() === 'preparing') &&
-      o._id !== userFirstOrder._id
+      o._id !== userActiveOrder._id
     );
     
     // Count how many orders are ahead of the user's order
     const ordersAhead = activeOrders.filter(o => 
-      new Date(o.createdAt) < new Date(userFirstOrder.createdAt)
+      new Date(o.createdAt) < new Date(userActiveOrder.createdAt)
     ).length;
     
     const totalQueueLength = activeOrders.filter(o =>
@@ -95,25 +145,33 @@ const MyOrders = () => {
     ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   };
 
-  const getStoreName = (stallId) => {
-    const stalls = {
-      1: 'Store 1',
-      2: 'Store 2',
-      3: 'Store 3',
-      4: 'Store 4',
-      5: 'Store 5',
-      6: 'Store 6',
-      7: 'Store 7',
-      8: 'Store 8',
-    };
-    return stalls[stallId] || 'Store';
+  const getStoreName = (order) => {
+    if (order?.storeName) return order.storeName;
+    if (typeof order?.stallId === 'object' && order?.stallId?.name) return order.stallId.name;
+    return 'Store';
+  };
+
+  const getGraceTimeLeft = (order) => {
+    if (order?.status?.toLowerCase() !== 'ready' || !order?.gracePeriodExpiresAt) {
+      return null;
+    }
+
+    const remaining = new Date(order.gracePeriodExpiresAt).getTime() - currentTime;
+    return Math.max(0, remaining);
+  };
+
+  const formatGraceTime = (remainingMs) => {
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div 
             className="flex items-center gap-3 cursor-pointer"
@@ -124,7 +182,7 @@ const MyOrders = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -181,12 +239,12 @@ const MyOrders = () => {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Orders</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">My Orders</h1>
           <p className="text-gray-600">Track your order status in real-time</p>
         </div>
 
         {/* FIFO Queue Section */}
-        {orders.length > 0 && (
+        {getPendingOrders().length > 0 && (
           <div className="mb-12 bg-gradient-to-br from-[#8B0000] to-red-800 rounded-lg shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -291,7 +349,7 @@ const MyOrders = () => {
                     <div>
                       <h2 className="text-2xl font-bold">Queue #{order.queueNumber || 'N/A'}</h2>
                       <p className="text-red-100 text-sm mt-1">
-                        {getStoreName(order.stallId)} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                        {getStoreName(order)} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
                     <div className={`px-4 py-2 rounded-full font-semibold text-lg ${getStatusColor(order.status)}`}>
@@ -308,6 +366,13 @@ const MyOrders = () => {
                       <p className="text-sm font-semibold">⏱️ Estimated Time: {order.estimatedTime} minutes</p>
                     </div>
                   )}
+                  {order.status?.toLowerCase() === 'ready' && getGraceTimeLeft(order) !== null && (
+                    <div className={`rounded px-3 py-2 inline-block mt-2 ${getGraceTimeLeft(order) <= 60 * 1000 ? 'bg-red-600' : 'bg-white bg-opacity-20'}`}>
+                      <p className="text-sm font-semibold">
+                        ⏳ Grace Period: {formatGraceTime(getGraceTimeLeft(order))}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Order Details */}
@@ -318,7 +383,15 @@ const MyOrders = () => {
                     <div className="space-y-2">
                       {order.items?.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                          <span className="text-gray-700">{item.name}</span>
+                          <span className="text-gray-700">
+                            <span>{item.name}</span>
+                            {item.variation && (
+                              <p className="text-xs italic text-gray-500">{item.variation}</p>
+                            )}
+                            <span>
+                              {item.riceOption === 'with_rice' ? ' (With Rice)' : item.riceOption === 'no_rice' ? ' (No Rice)' : ''}
+                            </span>
+                          </span>
                           <div className="text-right">
                             <span className="text-gray-600">x {item.quantity || 1}</span>
                             <span className="text-gray-900 font-semibold ml-4">₱{(item.price * (item.quantity || 1)).toFixed(2)}</span>
@@ -339,6 +412,98 @@ const MyOrders = () => {
                       <p className="font-semibold text-gray-900">{order.paymentMethod?.toUpperCase() || 'CASH'}</p>
                     </div>
                   </div>
+
+                  <div className="mt-4">
+                    {order.status?.toLowerCase() === 'pending' && (
+                      <button
+                        onClick={() => handleCancelOrder(order)}
+                        disabled={cancellingOrderId === order._id}
+                        className={`w-full py-2 rounded-lg font-semibold transition-colors ${cancellingOrderId === order._id ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                      >
+                        {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel Order'}
+                      </button>
+                    )}
+
+                    {order.status?.toLowerCase() === 'preparing' && (
+                      <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                        This order can no longer be cancelled because it is already being prepared.
+                      </p>
+                    )}
+                  </div>
+
+                  {order.status?.toLowerCase() === 'cancelled' && order.cancellationReason === 'manual_cancel' && (
+                    <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4">
+                      <p className="text-sm font-semibold text-red-800">Order cancelled by customer</p>
+
+                      {order.paymentMethod === 'gcash' && order.refundRequired ? (
+                        <>
+                          {order.refundStatus === 'proof_sent' ? (
+                            <div className="mt-2 text-sm text-green-700">
+                              <p className="font-semibold">Refund sent via GCash</p>
+                              {order.refundProofSentAt && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Sent: {new Date(order.refundProofSentAt).toLocaleString()}
+                                </p>
+                              )}
+                              {order.refundProofUrl && (
+                                <a
+                                  href={`${serverBaseUrl}${order.refundProofUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block mt-2 text-blue-700 underline"
+                                >
+                                  View refund proof image
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-amber-700 font-semibold">
+                              Refund is being processed by canteen staff through GCash.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-700">No refund is required for this order.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {order.status?.toLowerCase() === 'cancelled' && order.cancellationReason === 'grace_period_expired' && (
+                    <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4">
+                      <p className="text-sm font-semibold text-red-800">Order cancelled after 15-minute grace period</p>
+
+                      {order.paymentMethod === 'gcash' && order.refundRequired ? (
+                        <>
+                          {order.refundStatus === 'proof_sent' ? (
+                            <div className="mt-2 text-sm text-green-700">
+                              <p className="font-semibold">Refund sent via GCash</p>
+                              {order.refundProofSentAt && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Sent: {new Date(order.refundProofSentAt).toLocaleString()}
+                                </p>
+                              )}
+                              {order.refundProofUrl && (
+                                <a
+                                  href={`${serverBaseUrl}${order.refundProofUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block mt-2 text-blue-700 underline"
+                                >
+                                  View refund proof image
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-amber-700 font-semibold">
+                              Refund is being processed by canteen staff through GCash.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-700">No refund is required for this order.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

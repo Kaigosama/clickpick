@@ -74,7 +74,7 @@ const PaymentWaiting = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -82,7 +82,7 @@ const PaymentWaiting = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -140,9 +140,9 @@ const PaymentWaiting = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16 min-h-[calc(100vh-100px)] flex items-center justify-center">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16 min-h-[calc(100vh-100px)] flex items-center justify-center">
         {status === 'waiting' && (
-          <div className="bg-white rounded-lg shadow-2xl p-12 text-center border-4 border-blue-300">
+          <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-12 text-center border-4 border-blue-300 w-full">
             <div className="text-6xl mb-6 animate-bounce">⏳</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Under Review</h1>
             <p className="text-gray-600 text-lg mb-4">
@@ -161,7 +161,7 @@ const PaymentWaiting = () => {
         )}
 
         {status === 'approved' && (
-          <div className="bg-white rounded-lg shadow-2xl p-12 text-center border-4 border-green-500">
+          <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-12 text-center border-4 border-green-500 w-full">
             <div className="text-6xl mb-6">✓</div>
             <h1 className="text-3xl font-bold text-green-600 mb-3">Payment Approved!</h1>
             <p className="text-gray-600 text-lg mb-4">
@@ -180,7 +180,7 @@ const PaymentWaiting = () => {
         )}
 
         {status === 'rejected' && (
-          <div className="bg-white rounded-lg shadow-2xl p-12 text-center border-4 border-red-500">
+          <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-12 text-center border-4 border-red-500 w-full">
             <div className="text-6xl mb-6">✕</div>
             <h1 className="text-3xl font-bold text-red-600 mb-3">Payment Rejected</h1>
             <p className="text-gray-600 text-lg mb-4">
@@ -189,7 +189,7 @@ const PaymentWaiting = () => {
             <p className="text-gray-600 mb-8">
               Your payment could not be verified. Please contact the store or try again.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => navigate('/checkout')}
                 className="px-6 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition-colors"

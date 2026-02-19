@@ -69,6 +69,7 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
       password: req.body.password, // In a real app, we would encrypt this!
       role: req.body.role || 'customer', // Default to customer
       phone: req.body.phone,
+      gcashNumber: req.body.gcashNumber,
       logoUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
       logoPath: req.file ? req.file.path : undefined
     });
@@ -112,7 +113,7 @@ router.post('/login', async (req, res) => {
 router.get('/stalls', async (req, res) => {
   try {
     const stalls = await User.find({ role: 'stall_staff' })
-      .select('_id name logoUrl')
+      .select('_id name logoUrl gcashNumber')
       .sort({ createdAt: 1 });
 
     res.status(200).json(stalls);
@@ -124,15 +125,32 @@ router.get('/stalls', async (req, res) => {
 // UPDATE PROFILE (Customer or Stall Staff)
 router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
   try {
-    const { userId, name, email, phone } = req.body;
+    const { userId, name, email, phone, gcashNumber, password: newPassword } = req.body;
     if (!userId) {
       return res.status(400).json({ message: 'Missing userId' });
     }
 
+    const existingUser = await User.findById(userId);
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (email !== undefined && email !== existingUser.email) {
+      return res.status(400).json({ message: 'Email change is not allowed.' });
+    }
+
     const update = {};
     if (name !== undefined) update.name = name;
-    if (email !== undefined) update.email = email;
     if (phone !== undefined) update.phone = phone;
+    if (gcashNumber !== undefined) {
+      update.gcashNumber = String(gcashNumber).trim();
+    }
+    if (newPassword !== undefined && String(newPassword).trim() !== '') {
+      if (String(newPassword).trim().length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+      }
+      update.password = String(newPassword).trim();
+    }
     if (req.file) {
       update.logoUrl = `/uploads/${req.file.filename}`;
       update.logoPath = req.file.path;
@@ -148,7 +166,7 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { password, ...userWithoutPassword } = updatedUser._doc;
+    const { password: savedPassword, ...userWithoutPassword } = updatedUser._doc;
     res.status(200).json({ user: userWithoutPassword });
   } catch (err) {
     res.status(500).json({ message: 'Error updating profile' });

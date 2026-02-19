@@ -67,6 +67,8 @@ const Cart = () => {
         items: cartItems.map(item => ({
           menuItemId: item._id,
           name: item.name,
+          variation: item.selectedVariation || '',
+          riceOption: item.selectedRiceOption || '',
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -92,7 +94,7 @@ const Cart = () => {
     // Remove all items from the store
     const storeItems = groupedByStore[storeId] || [];
     storeItems.forEach(item => {
-      removeFromCart(item._id);
+      removeFromCart(item);
     });
   };
 
@@ -107,7 +109,7 @@ const Cart = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Header Navigation */}
       <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
             <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -115,7 +117,7 @@ const Cart = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-8">
+          <nav className="flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
             <button 
               onClick={() => navigate('/menu')}
               className="hover:opacity-80 font-semibold text-lg"
@@ -175,7 +177,7 @@ const Cart = () => {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-b-4 border-[#8B0000]">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/menu')}
@@ -183,7 +185,7 @@ const Cart = () => {
             >
               ← Back
             </button>
-            <h1 className="text-4xl font-bold text-gray-900">My Basket</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">My Basket</h1>
           </div>
         </div>
 
@@ -228,16 +230,22 @@ const Cart = () => {
                         <div key={idx} className="flex items-start justify-between py-3 border-b border-gray-200 last:border-0">
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">{item.name}</p>
+                            {item.selectedVariation && (
+                              <p className="text-xs text-gray-600 mt-1">Variation: {item.selectedVariation}</p>
+                            )}
+                            {item.riceOptionLabel && (
+                              <p className="text-xs text-gray-600 mt-1">Rice: {item.riceOptionLabel}</p>
+                            )}
                             <div className="flex items-center gap-2 mt-2">
                               <button
-                                onClick={() => decreaseQuantity(item._id)}
+                                onClick={() => decreaseQuantity(item)}
                                 className="w-6 h-6 bg-red-500 text-white font-bold rounded hover:bg-red-600 transition-colors text-sm"
                               >
                                 −
                               </button>
                               <span className="font-bold text-gray-900 min-w-4 text-center text-sm">{item.quantity || 1}</span>
                               <button
-                                onClick={() => increaseQuantity(item._id)}
+                                onClick={() => increaseQuantity(item)}
                                 className="w-6 h-6 bg-green-500 text-white font-bold rounded hover:bg-green-600 transition-colors text-sm"
                               >
                                 +

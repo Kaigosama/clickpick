@@ -7,6 +7,7 @@ import ProductDetail from '../components/ProductDetail.jsx';
 import CartPreview from '../components/CartPreview.jsx';
 import EditItemModal from '../components/EditItemModal.jsx';
 import AddItemModal from '../components/AddItemModal.jsx';
+import { getSocket } from '../services/socket.js';
 
 const StallMenu = () => {
   const { stallId } = useParams();
@@ -40,20 +41,89 @@ const StallMenu = () => {
   const isStaff = user?.role === 'stall_staff';
 
   useEffect(() => {
-    if (!user) navigate('/');
-    
-    api.get(`/menu?stall=${stallId}`)
-      .then(res => setItems(res.data))
-      .catch(err => {
+    if (!user) {
+      navigate('/');
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchMenuItems = async () => {
+      try {
+        const res = await api.get(`/menu?stall=${stallId}`);
+        if (isMounted) {
+          setItems(res.data || []);
+        }
+      } catch (err) {
         console.error(err);
-        setItems([
-          { _id: '1', name: 'Burger', price: 75, isAvailable: true, stall: stallId },
-          { _id: '2', name: 'Fries', price: 45, isAvailable: true, stall: stallId },
-          { _id: '3', name: 'Drink', price: 35, isAvailable: true, stall: stallId },
-        ]);
-      })
-      .finally(() => setLoading(false));
+        if (isMounted && !items.length) {
+          setItems([
+            { _id: '1', name: 'Burger', price: 75, isAvailable: true, stall: stallId },
+            { _id: '2', name: 'Fries', price: 45, isAvailable: true, stall: stallId },
+            { _id: '3', name: 'Drink', price: 35, isAvailable: true, stall: stallId },
+          ]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchMenuItems();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user, navigate, stallId]);
+
+  useEffect(() => {
+    if (!user || !stallId) return;
+
+    const socket = getSocket();
+
+    const handleMenuUpdated = async (payload) => {
+      if (!payload?.stallId || String(payload.stallId) !== String(stallId)) return;
+
+      try {
+        const res = await api.get(`/menu?stall=${stallId}`);
+        setItems(res.data || []);
+      } catch (err) {
+        console.error('Socket refresh failed:', err);
+      }
+    };
+
+    socket.emit('join_stall', stallId);
+    socket.on('menu:updated', handleMenuUpdated);
+
+    return () => {
+      socket.emit('leave_stall', stallId);
+      socket.off('menu:updated', handleMenuUpdated);
+    };
+  }, [user, stallId]);
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+
+    const latestItem = items.find((item) => item._id === selectedProduct._id);
+    if (!latestItem) {
+      setSelectedProduct(null);
+      return;
+    }
+
+    const changed =
+      selectedProduct.price !== latestItem.price ||
+      selectedProduct.quantity !== latestItem.quantity ||
+      selectedProduct.isAvailable !== latestItem.isAvailable ||
+      selectedProduct.variation !== latestItem.variation ||
+      selectedProduct.noRiceAvailable !== latestItem.noRiceAvailable ||
+      selectedProduct.withRiceAvailable !== latestItem.withRiceAvailable ||
+      selectedProduct.withRiceAdditionalPrice !== latestItem.withRiceAdditionalPrice;
+
+    if (changed) {
+      setSelectedProduct(latestItem);
+    }
+  }, [items, selectedProduct]);
 
   // Fetch orders for staff
   useEffect(() => {
@@ -85,6 +155,8 @@ const StallMenu = () => {
         items: cartItems.map(item => ({
           menuItemId: item._id,
           name: item.name,
+          variation: item.selectedVariation || '',
+          riceOption: item.selectedRiceOption || '',
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -145,6 +217,38 @@ const StallMenu = () => {
     return { pending, preparing, ready, total: pending + preparing + ready };
   };
 
+  const categoryDisplayOrder = ['Main', 'Snacks', 'Drinks', 'Desserts'];
+  const getNormalizedCategory = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return 'Others';
+    const matched = categoryDisplayOrder.find(
+      (entry) => entry.toLowerCase() === raw.toLowerCase()
+    );
+    return matched || raw;
+  };
+
+  const categoryGroups = (() => {
+    const grouped = items.reduce((acc, item) => {
+      const category = getNormalizedCategory(item.category);
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(item);
+      return acc;
+    }, {});
+
+    const preferred = categoryDisplayOrder
+      .filter((category) => grouped[category]?.length)
+      .map((category) => ({ category, items: grouped[category] }));
+
+    const others = Object.keys(grouped)
+      .filter((category) => !categoryDisplayOrder.includes(category))
+      .sort((a, b) => a.localeCompare(b))
+      .map((category) => ({ category, items: grouped[category] }));
+
+    return [...preferred, ...others];
+  })();
+
   if (!stall) {
     return <div className="text-center py-12">Stall not found</div>;
   }
@@ -154,7 +258,7 @@ const StallMenu = () => {
       {/* Header Navigation - staff or customer */}
       {!isStaff ? (
         <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
               <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
               <span className="text-xl font-bold">ClickPick</span>
@@ -503,37 +607,13 @@ const StallMenu = () => {
               <div className="text-center py-12">Loading menu items...</div>
             ) : (
               isStaff ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                <div className="space-y-8">
                   {items.length === 0 ? (
-                    <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center py-12 bg-white rounded-lg">
-                      No menu items available for this stall
-                    </div>
-                  ) : (
                     <>
-                      {items.map(item => (
-                        <div
-                          key={item._id}
-                          onClick={() => setEditingItem(item)}
-                          className="bg-white rounded-lg border-4 border-gray-300 shadow hover:shadow-lg transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
-                        >
-                          <div className="p-6 flex flex-col items-center gap-3">
-                            <div className="w-28 h-28 bg-[#8B0000] rounded-md flex items-center justify-center text-3xl text-white">Img</div>
-                            <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                            <p className="text-sm text-gray-600">Quantity: <span className="font-bold">{item.quantity ?? 24}</span></p>
-                            <button
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setEditingItem(item);
-                              }}
-                              className="mt-3 px-4 py-2 border border-gray-400 rounded text-sm font-semibold hover:bg-gray-100 w-full"
-                            >
-                              Edit Item
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      <div className="bg-white rounded-lg border-4 border-dashed border-gray-300 shadow flex items-center justify-center cursor-pointer hover:scale-105 transform duration-200">
+                      <div className="text-center py-12 bg-white rounded-lg">
+                        No menu items available for this stall
+                      </div>
+                      <div className="max-w-sm bg-white rounded-lg border-4 border-dashed border-gray-300 shadow flex items-center justify-center cursor-pointer hover:scale-105 transform duration-200">
                         <button
                           onClick={() => setShowAddItemModal(true)}
                           className="flex flex-col items-center justify-center p-8 text-gray-500 w-full h-full"
@@ -543,97 +623,159 @@ const StallMenu = () => {
                         </button>
                       </div>
                     </>
+                  ) : (
+                    <>
+                      <div className="max-w-sm bg-white rounded-lg border-4 border-dashed border-gray-300 shadow flex items-center justify-center cursor-pointer hover:scale-105 transform duration-200">
+                        <button
+                          onClick={() => setShowAddItemModal(true)}
+                          className="flex flex-col items-center justify-center p-8 text-gray-500 w-full h-full"
+                        >
+                          <div className="w-20 h-20 rounded border border-gray-300 flex items-center justify-center text-4xl">+</div>
+                          <p className="mt-3 font-semibold">Add Item</p>
+                        </button>
+                      </div>
+
+                      {categoryGroups.map((group) => (
+                        <div key={group.category} className="space-y-4">
+                          <h2 className="text-2xl font-bold text-gray-900">{group.category}</h2>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                            {group.items.map(item => (
+                              <div
+                                key={item._id}
+                                onClick={() => setEditingItem(item)}
+                                className="bg-white rounded-lg border-4 border-gray-300 shadow hover:shadow-lg transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
+                              >
+                                <div className="p-6 flex flex-col items-center gap-3">
+                                  <div className="w-28 h-28 bg-[#8B0000] rounded-md flex items-center justify-center text-3xl text-white">Img</div>
+                                  <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
+                                  <p className="text-sm text-gray-600">Quantity: <span className="font-bold">{item.quantity ?? 24}</span></p>
+                                  <button
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setEditingItem(item);
+                                    }}
+                                    className="mt-3 px-4 py-2 border border-gray-400 rounded text-sm font-semibold hover:bg-gray-100 w-full"
+                                  >
+                                    Edit Item
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="space-y-8">
                   {items.length === 0 ? (
-                    <div className="col-span-2 md:col-span-3 lg:col-span-4 text-center py-12 bg-white rounded-lg">
+                    <div className="text-center py-12 bg-white rounded-lg">
                       No menu items available for this stall
                     </div>
                   ) : (
-                    items.map(item => {
-                      const quantity = itemQuantities[item._id] || 0;
-                      return (
-                        <div 
-                          key={item._id}
-                          onClick={() => setSelectedProduct(item)}
-                          className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
-                        >
-                          <div className="bg-[#8B0000] h-32 flex items-center justify-center text-5xl border-b-2 border-gray-300">
-                            🍽️
-                          </div>
-                          
-                          <div className="p-4 flex-grow flex flex-col">
-                            <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
-                            <p className="text-2xl font-bold text-gray-900 my-2">₱{item.price}</p>
-                            
-                            <p className="text-xs text-gray-500 mb-3">
-                              {item.isAvailable ? '✓ Available' : '✗ Low Stock'}
-                            </p>
+                    categoryGroups.map((group) => (
+                      <div key={group.category} className="space-y-4">
+                        <h2 className="text-2xl font-bold text-gray-900">{group.category}</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                          {group.items.map(item => {
+                            const quantity = itemQuantities[item._id] || 0;
+                            const requiresRiceChoice =
+                              String(item.category || '').toLowerCase() === 'main' &&
+                              (item.noRiceAvailable || item.withRiceAvailable);
+                            return (
+                              <div 
+                                key={item._id}
+                                onClick={() => setSelectedProduct(item)}
+                                className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col cursor-pointer hover:border-[#8B0000] hover:scale-105 transform duration-200"
+                              >
+                                <div className="bg-[#8B0000] h-32 flex items-center justify-center text-5xl border-b-2 border-gray-300">
+                                  🍽️
+                                </div>
+                                
+                                <div className="p-4 flex-grow flex flex-col">
+                                  <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
+                                  <p className="text-2xl font-bold text-gray-900 my-2">₱{item.price}</p>
+                                  
+                                  <p className="text-xs text-gray-500 mb-3">
+                                    {item.isAvailable ? '✓ Available' : '✗ Low Stock'}
+                                  </p>
 
-                            <div 
-                              onClick={(e) => e.stopPropagation()}
-                              className="border-2 border-gray-400 rounded px-3 py-2 mb-3"
-                            >
-                              <p className="text-center text-sm font-semibold text-gray-700">{quantity}</p>
-                              <div className="flex items-center justify-between gap-2 mt-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setItemQuantities(prev => ({
-                                      ...prev,
-                                      [item._id]: Math.max(0, quantity - 1)
-                                    }));
-                                  }}
-                                  className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
-                                >
-                                  −
-                                </button>
-                                <span className="text-xs font-semibold text-gray-600">Qty</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setItemQuantities(prev => ({
-                                      ...prev,
-                                      [item._id]: quantity + 1
-                                    }));
-                                  }}
-                                  className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
-                                >
-                                  +
-                                </button>
+                                  {!requiresRiceChoice && (
+                                    <div 
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="border-2 border-gray-400 rounded px-3 py-2 mb-3"
+                                    >
+                                      <p className="text-center text-sm font-semibold text-gray-700">{quantity}</p>
+                                      <div className="flex items-center justify-between gap-2 mt-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setItemQuantities(prev => ({
+                                              ...prev,
+                                              [item._id]: Math.max(0, quantity - 1)
+                                            }));
+                                          }}
+                                          className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                        >
+                                          −
+                                        </button>
+                                        <span className="text-xs font-semibold text-gray-600">Qty</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setItemQuantities(prev => ({
+                                              ...prev,
+                                              [item._id]: quantity + 1
+                                            }));
+                                          }}
+                                          className="text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {requiresRiceChoice && (
+                                    <p className="text-xs text-gray-600 mb-3">Select rice option before adding.</p>
+                                  )}
+
+                                  <button 
+                                    disabled={!item.isAvailable || (!requiresRiceChoice && quantity === 0)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (requiresRiceChoice) {
+                                        setSelectedProduct(item);
+                                        return;
+                                      }
+                                      for (let i = 0; i < quantity; i++) {
+                                        const itemToAdd = {
+                                          ...item,
+                                          stallId: stallId
+                                        };
+                                        addToCart(itemToAdd);
+                                      }
+                                      setItemQuantities(prev => ({
+                                        ...prev,
+                                        [item._id]: 0
+                                      }));
+                                    }}
+                                    className={`w-full py-2 rounded-lg font-bold transition-all text-sm ${
+                                      !item.isAvailable || (!requiresRiceChoice && quantity === 0)
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                        : 'bg-[#8B0000] text-white hover:bg-red-800'
+                                    }`}
+                                  >
+                                    {requiresRiceChoice ? 'Choose Rice Option' : 'Add to Basket'}
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-
-                            <button 
-                              disabled={!item.isAvailable || quantity === 0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                for (let i = 0; i < quantity; i++) {
-                                  const itemToAdd = {
-                                    ...item,
-                                    stallId: stallId
-                                  };
-                                  addToCart(itemToAdd);
-                                }
-                                setItemQuantities(prev => ({
-                                  ...prev,
-                                  [item._id]: 0
-                                }));
-                              }}
-                              className={`w-full py-2 rounded-lg font-bold transition-all text-sm ${
-                                !item.isAvailable || quantity === 0
-                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                                  : 'bg-[#8B0000] text-white hover:bg-red-800'
-                              }`}
-                            >
-                              Add to Basket
-                            </button>
-                          </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })
+                      </div>
+                    ))
                   )}
                 </div>
               )
