@@ -103,12 +103,12 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">{item.name}</h2>
 
           {/* Product Image / Icon */}
-          <div className="bg-[#8B0000] h-48 rounded-lg flex items-center justify-center text-8xl mb-8 border-2 border-gray-300 overflow-hidden">
+          <div className="bg-[#8B0000] h-48 rounded-lg flex items-center justify-center text-8xl mb-8 border-2 border-gray-300 overflow-hidden p-2">
             {item.image ? (
               <img
                 src={toServerAssetUrl(item.image)}
                 alt={item.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             ) : (
               <span>🍽️</span>

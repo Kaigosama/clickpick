@@ -1369,12 +1369,12 @@ const StallMenu = () => {
                                 onClick={() => setSelectedProduct(item)}
                                 className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col self-start cursor-pointer hover:border-[#8B0000]"
                               >
-                                <div className="bg-[#8B0000] w-full h-24 sm:aspect-square sm:h-auto flex items-center justify-center text-2xl sm:text-5xl border-b-2 border-gray-300 overflow-hidden">
+                                <div className="bg-[#8B0000] w-full max-w-[110px] sm:max-w-none aspect-square mx-auto sm:mx-0 flex items-center justify-center text-2xl sm:text-5xl border-b-2 border-gray-300 overflow-hidden p-1">
                                   {item.image ? (
                                     <img
                                       src={resolveItemImage(item.image)}
                                       alt={item.name}
-                                      className="w-full h-full object-cover"
+                                      className="w-full h-full object-contain"
                                     />
                                   ) : (
                                     <span>🍽️</span>
