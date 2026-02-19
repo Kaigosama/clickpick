@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import CartPreview from '../components/CartPreview.jsx';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const Menu = () => {
   const navigate = useNavigate();
@@ -168,7 +169,7 @@ const Menu = () => {
                 <div className="w-24 h-24 bg-[#8B0000] rounded flex items-center justify-center mb-4 text-5xl overflow-hidden">
                   {stall.logoUrl ? (
                     <img
-                      src={`http://localhost:5000${stall.logoUrl}`}
+                      src={toServerAssetUrl(stall.logoUrl)}
                       alt={`${stall.name} logo`}
                       className="w-full h-full object-cover"
                     />

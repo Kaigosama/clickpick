@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ const Checkout = () => {
 
   const resolveStallLogo = (stall) => {
     if (!stall?.logoUrl) return null;
-    return stall.logoUrl.startsWith('http') ? stall.logoUrl : `http://localhost:5000${stall.logoUrl}`;
+    return toServerAssetUrl(stall.logoUrl);
   };
 
   const getStoreTotal = (storeId) => {

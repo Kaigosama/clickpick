@@ -8,6 +8,7 @@ import CartPreview from '../components/CartPreview.jsx';
 import EditItemModal from '../components/EditItemModal.jsx';
 import AddItemModal from '../components/AddItemModal.jsx';
 import { getSocket } from '../services/socket.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const StallMenu = () => {
   const { stallId } = useParams();
@@ -28,6 +29,7 @@ const StallMenu = () => {
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [salesOrders, setSalesOrders] = useState([]);
+  const [cancelledOrders, setCancelledOrders] = useState([]);
   const [refundProofFiles, setRefundProofFiles] = useState({});
   const [uploadingRefundForOrder, setUploadingRefundForOrder] = useState('');
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -178,29 +180,37 @@ const StallMenu = () => {
     fetchStalls();
   }, [defaultStalls.length]);
 
+  const refreshStaffOrders = async () => {
+    if (!isStaff || !user?._id) return;
+
+    try {
+      const res = await api.get(`/orders?stallId=${user._id}`);
+      const allOrders = Array.isArray(res.data) ? res.data : [];
+
+      const liveOrders = allOrders.filter((order) => {
+        const status = String(order.status || '').toLowerCase();
+        return status === 'pending' || status === 'preparing' || status === 'ready';
+      });
+
+      const completed = allOrders
+        .filter((order) => String(order.status || '').toLowerCase() === 'completed')
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+      const cancelled = allOrders
+        .filter((order) => String(order.status || '').toLowerCase() === 'cancelled')
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+      setOrders(liveOrders);
+      setSalesOrders(completed);
+      setCancelledOrders(cancelled);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+    }
+  };
+
   // Fetch orders for staff
   useEffect(() => {
     if (isStaff) {
-      const fetchOrders = async () => {
-        try {
-          const res = await api.get(`/orders?stallId=${user._id}`);
-          const activeOrders = res.data.filter(o => o.status !== 'completed');
-          setOrders(activeOrders);
-        } catch (err) {
-          console.error('Error fetching orders:', err);
-        }
-      };
-
-      const fetchSalesOrders = async () => {
-        try {
-          const res = await api.get(`/orders?stallId=${user._id}`);
-          const completedOrders = res.data.filter(o => o.status === 'completed');
-          setSalesOrders(completedOrders);
-        } catch (err) {
-          console.error('Error fetching sales orders:', err);
-        }
-      };
-      
       const fetchPendingPayments = async () => {
         try {
           const res = await api.get(`/payments/pending-payments?stallId=${user._id}`);
@@ -211,13 +221,12 @@ const StallMenu = () => {
         }
       };
       
-      fetchOrders();
+      refreshStaffOrders();
       fetchPendingPayments();
-      fetchSalesOrders();
+
       const interval = setInterval(() => {
-        fetchOrders();
+        refreshStaffOrders();
         fetchPendingPayments();
-        fetchSalesOrders();
       }, 5000);
       return () => clearInterval(interval);
     }
@@ -318,9 +327,7 @@ const StallMenu = () => {
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       await api.put(`/orders/${orderId}`, { status: newStatus });
-      setOrders(orders.map(o => 
-        o._id === orderId ? { ...o, status: newStatus } : o
-      ));
+      await refreshStaffOrders();
     } catch (err) {
       console.error('Error updating order:', err);
       alert('Failed to update order status');
@@ -336,9 +343,7 @@ const StallMenu = () => {
       // Refresh both payments and orders
       const paymentsRes = await api.get(`/payments/pending-payments?stallId=${user._id}`);
       setPendingPayments(paymentsRes.data.payments || []);
-      const ordersRes = await api.get(`/orders?stallId=${user._id}`);
-      const activeOrders = ordersRes.data.filter(o => o.status !== 'completed');
-      setOrders(activeOrders);
+      await refreshStaffOrders();
     } catch (err) {
       alert("Failed to approve payment: " + (err.response?.data?.message || err.message));
     }
@@ -384,9 +389,7 @@ const StallMenu = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const ordersRes = await api.get(`/orders?stallId=${user._id}`);
-      const activeOrders = ordersRes.data.filter(o => o.status !== 'completed');
-      setOrders(activeOrders);
+      await refreshStaffOrders();
 
       setRefundProofFiles((prev) => ({
         ...prev,
@@ -421,9 +424,7 @@ const StallMenu = () => {
   };
 
   const getCancelledOrders = () => {
-    return orders
-      .filter(o => o.status?.toLowerCase() === 'cancelled')
-      .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    return cancelledOrders;
   };
 
   const getQueueStats = () => {
@@ -743,7 +744,7 @@ const StallMenu = () => {
 
             <div className="bg-gradient-to-br from-[#c41e3a] to-[#8B0000] rounded-lg shadow-lg p-8 text-white">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold">📋 Live Orders Queue (FIFO)</h2>
+              <h2 className="text-3xl font-bold">📋 Live Orders Queue</h2>
               <button
                 onClick={() => setShowQueueFlow(!showQueueFlow)}
                 className="bg-white text-[#8B0000] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm"
@@ -920,76 +921,6 @@ const StallMenu = () => {
                   </div>
                 )}
 
-                {getCancelledOrders().length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold text-red-400 mb-4">❌ Cancelled Orders</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {getCancelledOrders().map(order => (
-                        <div key={order._id} className="bg-red-400 bg-opacity-15 border-2 border-red-400 rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <span className="text-lg font-bold">Order #{order.queueNumber}</span>
-                              <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
-                            </div>
-                            <span className="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">CANCELLED</span>
-                          </div>
-                          <p className="text-sm mb-2"><strong>Items:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
-                          <div className="grid grid-cols-2 gap-2 mb-3">
-                            <div>
-                              <p className="text-xs opacity-75"><strong>Amount:</strong></p>
-                              <p className="text-sm">₱{order.totalAmount}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs opacity-75"><strong>Reason:</strong></p>
-                              <p className="text-sm font-semibold">{order.cancellationReason === 'grace_period_expired' ? 'Grace Period' : 'Manual Cancel'}</p>
-                            </div>
-                          </div>
-
-                          {order.paymentMethod === 'gcash' && order.refundRequired && (
-                            <div className="mt-3 rounded-lg border border-red-300 bg-white bg-opacity-20 p-3">
-                              <p className="text-xs font-semibold mb-2">Refund Status: {order.refundStatus === 'proof_sent' ? 'Proof Sent' : 'Pending Refund Proof'}</p>
-
-                              {order.refundStatus === 'proof_sent' ? (
-                                <>
-                                  {order.refundProofSentAt && (
-                                    <p className="text-xs opacity-80 mb-2">Sent: {new Date(order.refundProofSentAt).toLocaleString()}</p>
-                                  )}
-                                  {order.refundProofUrl && (
-                                    <a
-                                      href={`http://localhost:5000${order.refundProofUrl}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-block text-sm underline font-semibold"
-                                    >
-                                      View refund proof
-                                    </a>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleRefundProofChange(order._id, e.target.files?.[0] || null)}
-                                    className="w-full text-xs mb-2"
-                                  />
-                                  <button
-                                    onClick={() => submitRefundProof(order._id)}
-                                    disabled={uploadingRefundForOrder === order._id}
-                                    className={`w-full py-2 rounded font-semibold text-sm ${uploadingRefundForOrder === order._id ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-[#8B0000] text-white hover:bg-red-800'}`}
-                                  >
-                                    {uploadingRefundForOrder === order._id ? 'Uploading...' : 'Submit Refund Proof'}
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {getQueueStats().total === 0 && (
                   <div className="text-center py-12">
                     <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
@@ -1004,6 +935,59 @@ const StallMenu = () => {
                 <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
               </div>
             )}
+          </div>
+
+          <div className="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-2xl font-bold text-gray-900">🕘 Order History</h3>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-6 gap-2 bg-gray-100 text-xs font-bold text-gray-700 uppercase px-4 py-3">
+                <div>Status</div>
+                <div>Queue #</div>
+                <div className="col-span-2">Items</div>
+                <div>Reason</div>
+                <div>Updated At</div>
+              </div>
+
+              <div className="max-h-[320px] overflow-y-auto">
+                {(() => {
+                  const historyRows = [
+                    ...salesOrders.map((order) => ({
+                      ...order,
+                      historyType: 'completed',
+                    })),
+                    ...getCancelledOrders().map((order) => ({
+                      ...order,
+                      historyType: 'cancelled',
+                    })),
+                  ].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+                  if (historyRows.length === 0) {
+                    return <div className="px-4 py-8 text-center text-gray-500">No completed or cancelled orders yet.</div>;
+                  }
+
+                  return historyRows.map((order) => (
+                    <div key={`${order.historyType}-${order._id}`} className="grid grid-cols-6 gap-2 border-t border-gray-200 px-4 py-3 text-sm text-gray-700">
+                      <div>
+                        <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-bold ${order.historyType === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {order.historyType === 'completed' ? 'COMPLETED' : 'CANCELLED'}
+                        </span>
+                      </div>
+                      <div className="font-semibold">#{order.queueNumber || order._id}</div>
+                      <div className="col-span-2">{order.items?.map((item) => `${item.quantity}x ${item.name}`).join(', ') || 'N/A'}</div>
+                      <div>
+                        {order.historyType === 'cancelled'
+                          ? (order.cancellationReason === 'grace_period_expired' ? 'Grace period expired' : 'Manual cancel')
+                          : '-'}
+                      </div>
+                      <div>{order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A'}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
           </div>
           </>
         ) : isStaff && activeTab === 'sales' ? (
@@ -1107,7 +1091,7 @@ const StallMenu = () => {
                 <div className="w-20 h-20 bg-[#8B0000] rounded-lg flex items-center justify-center text-5xl overflow-hidden">
                   {stall.logoUrl ? (
                     <img
-                      src={`http://localhost:5000${stall.logoUrl}`}
+                      src={toServerAssetUrl(stall.logoUrl)}
                       alt={`${stall.name} logo`}
                       className="w-full h-full object-cover"
                     />

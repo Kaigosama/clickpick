@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -33,8 +34,7 @@ const Profile = () => {
       confirmPassword: ''
     });
     if (user.logoUrl) {
-      const url = user.logoUrl.startsWith('http') ? user.logoUrl : `http://localhost:5000${user.logoUrl}`;
-      setLogoPreview(url);
+      setLogoPreview(toServerAssetUrl(user.logoUrl));
     }
   }, [user, navigate]);
 
