@@ -1,33 +1,62 @@
 const nodemailer = require('nodemailer');
 
-const smtpHost = process.env.SMTP_HOST;
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpSecure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
-const smtpUser = process.env.SMTP_USER;
-const smtpPass = process.env.SMTP_PASS;
-const smtpFrom = process.env.SMTP_FROM || smtpUser || 'no-reply@clickpick.local';
+const maskEmail = (value) => {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email.includes('@')) return email;
 
-const isSmtpConfigured = Boolean(smtpHost && smtpUser && smtpPass);
+  const [localPart, domainPart] = email.split('@');
+  const localVisible = localPart.slice(0, Math.min(2, localPart.length));
+  const maskedLocal = `${localVisible}${'*'.repeat(Math.max(0, localPart.length - localVisible.length))}`;
+
+  return `${maskedLocal}@${domainPart}`;
+};
+
+const getSmtpConfig = () => {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || user;
+
+  return {
+    host,
+    port,
+    secure,
+    user,
+    pass,
+    from,
+    isConfigured: Boolean(host && user && pass)
+  };
+};
 
 const getTransporter = () => {
-  if (!isSmtpConfigured) {
+  const config = getSmtpConfig();
+
+  if (!config.isConfigured) {
     return null;
   }
 
   return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
     auth: {
-      user: smtpUser,
-      pass: smtpPass
+      user: config.user,
+      pass: config.pass
     }
   });
 };
 
 const sendEmailMessage = async ({ to, subject, text }) => {
+  const config = getSmtpConfig();
+
+  if (!to) {
+    throw new Error('Recipient email is required.');
+  }
+
   const message = {
-    from: smtpFrom,
+    from: config.from,
     to,
     subject,
     text
@@ -37,7 +66,7 @@ const sendEmailMessage = async ({ to, subject, text }) => {
 
   if (!transporter) {
     console.log('--- EMAIL SIMULATION (SMTP not configured) ---');
-    console.log(`To: ${to}`);
+    console.log(`To: ${maskEmail(to)}`);
     console.log(`Subject: ${subject}`);
     console.log(`Message: ${text}`);
     console.log('---------------------------------------------');

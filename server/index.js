@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const path = require('path');
 
+dotenv.config();
+
 // Import Routes
 const authRoute = require('./routes/auth');
 const menuRoute = require('./routes/menu');
@@ -13,7 +15,6 @@ const paymentsRoute = require('./routes/payments');
 const { processExpiredReadyOrders } = require('./utils/orderGraceService');
 const { setSocketServer } = require('./socket');
 
-dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;

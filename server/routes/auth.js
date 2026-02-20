@@ -37,6 +37,17 @@ const generateVerificationCode = () => String(Math.floor(100000 + Math.random() 
 const RESET_CODE_COOLDOWN_MS = 30 * 1000;
 const EMAIL_VERIFICATION_COOLDOWN_MS = 30 * 1000;
 
+const maskEmail = (value) => {
+  const email = normalizeEmail(value);
+  if (!email.includes('@')) return email;
+
+  const [localPart, domainPart] = email.split('@');
+  const localVisible = localPart.slice(0, Math.min(2, localPart.length));
+  const maskedLocal = `${localVisible}${'*'.repeat(Math.max(0, localPart.length - localVisible.length))}`;
+
+  return `${maskedLocal}@${domainPart}`;
+};
+
 const applyEmailVerificationCode = (user) => {
   user.emailVerificationCode = generateVerificationCode();
   user.emailVerificationCodeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -91,7 +102,7 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
 
     res.status(201).json({
       requiresEmailVerification: true,
-      email: savedUser.email,
+      maskedEmail: maskEmail(savedUser.email),
       message: 'Registration successful. Verification code sent to your email.'
     });
   } catch (err) {
@@ -122,7 +133,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({
         message: 'Please verify your email before signing in.',
         needsEmailVerification: true,
-        email: user.email
+        maskedEmail: maskEmail(user.email)
       });
     }
 

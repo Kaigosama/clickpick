@@ -238,12 +238,12 @@ const Auth = () => {
           setIsForgotMode(false);
           setResetCodeSent(false);
           setResendCooldown(0);
-          setEmail(res.data.email || email);
+          setEmail(email);
           setEmailVerifyCode('');
           setEmailVerifyCooldown(30);
           setPassword('');
           setConfirmPassword('');
-          alert(res.data.message || 'Registration successful. Please verify your email.');
+          alert(`${res.data.message || 'Registration successful. Please verify your email.'}${res.data.maskedEmail ? ` (${res.data.maskedEmail})` : ''}`);
         } else {
           setIsLogin(true);
           setSelectedRole(null); // Reset role selection
@@ -259,10 +259,12 @@ const Auth = () => {
         setIsForgotMode(false);
         setResetCodeSent(false);
         setResendCooldown(0);
-        setEmail(err.response?.data?.email || email);
+        setEmail(email);
         setEmailVerifyCode('');
         setEmailVerifyCooldown(30);
-        alert(err.response?.data?.message || 'Please verify your email first.');
+        const message = err.response?.data?.message || 'Please verify your email first.';
+        const maskedEmail = err.response?.data?.maskedEmail;
+        alert(`${message}${maskedEmail ? ` (${maskedEmail})` : ''}`);
         return;
       }
       const message = err.response?.data?.message || "An error occurred. Please try again.";
