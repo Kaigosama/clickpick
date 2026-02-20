@@ -5,11 +5,13 @@ import api from '../services/api'; // Import our centralized API service
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotMode, setIsForgotMode] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null); // User selects role first
   
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState(''); 
   const [logoFile, setLogoFile] = useState(null);
   const [phone, setPhone] = useState('');
@@ -19,6 +21,38 @@ const Auth = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isForgotMode) {
+      if (!email) {
+        alert('Please enter your email address.');
+        return;
+      }
+      if (!password || password.length < 6) {
+        alert('New password must be at least 6 characters.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        alert('Passwords do not match.');
+        return;
+      }
+
+      try {
+        await api.post('/auth/forgot-password', {
+          email,
+          newPassword: password
+        });
+        alert('Password reset successful. Please login with your new password.');
+        setIsForgotMode(false);
+        setIsLogin(true);
+        setPassword('');
+        setConfirmPassword('');
+        return;
+      } catch (err) {
+        const message = err.response?.data?.message || 'Unable to reset password. Please try again.';
+        alert(message);
+        return;
+      }
+    }
 
     // 1. Validation Logic - Only check Mapúa email for customers
     if (!isLogin && selectedRole === 'customer' && !email.endsWith('@mymail.mapua.edu.ph')) {
@@ -150,7 +184,7 @@ const Auth = () => {
           <>
             {/* Input Form */}
             <form onSubmit={handleSubmit} className="w-full space-y-6">
-              {!isLogin && (
+              {!isLogin && !isForgotMode && (
                   <input 
                     type="text" 
                     placeholder={selectedRole === 'stall_staff' ? 'Store Name' : 'Full Name'} 
@@ -161,7 +195,7 @@ const Auth = () => {
                   />
               )}
 
-              {!isLogin && selectedRole === 'stall_staff' && (
+              {!isLogin && !isForgotMode && selectedRole === 'stall_staff' && (
                 <div className="w-full text-left">
                   <label className="block text-xs text-white/60 mb-2 uppercase tracking-[0.2em]">
                     Store Logo (optional)
@@ -184,7 +218,7 @@ const Auth = () => {
                 className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
               />
 
-              {!isLogin && selectedRole === 'customer' && (
+              {!isLogin && !isForgotMode && selectedRole === 'customer' && (
                 <input
                   type="tel"
                   placeholder="Phone Number"
@@ -198,31 +232,68 @@ const Auth = () => {
               <div className="relative w-full">
                 <input 
                   type="password" 
-                  placeholder="Password" 
+                  placeholder={isForgotMode ? 'New Password' : 'Password'} 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                   required
                   className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
                 />
-                <button type="button" className="absolute right-0 bottom-[-24px] text-[10px] text-white/50 hover:text-white transition-colors uppercase tracking-tighter underline">
-                  Forgot Password?
-                </button>
+                {isLogin && !isForgotMode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotMode(true);
+                      setPassword('');
+                      setConfirmPassword('');
+                    }}
+                    className="absolute right-0 bottom-[-24px] text-[10px] text-white/50 hover:text-white transition-colors uppercase tracking-tighter underline"
+                  >
+                    Forgot Password?
+                  </button>
+                )}
               </div>
+
+              {isForgotMode && (
+                <input
+                  type="password"
+                  placeholder="Confirm New Password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
+                />
+              )}
 
               <div className="pt-8 space-y-4">
                 <button type="submit" className="w-full bg-white py-4 text-black font-black hover:bg-gray-200 transition-all uppercase tracking-[0.2em] text-sm active:scale-95">
-                  {isLogin ? 'Sign In' : 'Create Account'}
+                  {isForgotMode ? 'Reset Password' : (isLogin ? 'Sign In' : 'Create Account')}
                 </button>
-                <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full bg-transparent border border-white/30 py-4 text-white font-semibold hover:bg-white/10 transition-all uppercase tracking-[0.1em] text-xs active:scale-95">
-                  {isLogin ? 'Register' : 'Back to Login'}
-                </button>
+                {!isForgotMode ? (
+                  <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full bg-transparent border border-white/30 py-4 text-white font-semibold hover:bg-white/10 transition-all uppercase tracking-[0.1em] text-xs active:scale-95">
+                    {isLogin ? 'Register' : 'Back to Login'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotMode(false);
+                      setPassword('');
+                      setConfirmPassword('');
+                    }}
+                    className="w-full bg-transparent border border-white/30 py-4 text-white font-semibold hover:bg-white/10 transition-all uppercase tracking-[0.1em] text-xs active:scale-95"
+                  >
+                    Back to Login
+                  </button>
+                )}
                 <button 
                   type="button" 
                   onClick={() => {
                     setSelectedRole(null);
                     setIsLogin(true);
+                    setIsForgotMode(false);
                     setEmail('');
                     setPassword('');
+                    setConfirmPassword('');
                     setName('');
                   }} 
                   className="w-full bg-transparent border border-white/30 py-3 text-white/60 font-semibold hover:bg-white/5 transition-all uppercase tracking-[0.1em] text-xs active:scale-95"

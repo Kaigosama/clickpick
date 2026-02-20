@@ -30,6 +30,8 @@ const toImageDataUrl = (file) => {
   return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 };
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 // Helper function to generate JWT
 const generateToken = (userId) => {
   return jwt.sign(
@@ -42,8 +44,13 @@ const generateToken = (userId) => {
 // REGISTER
 router.post('/register', uploadLogoIfMultipart, async (req, res) => {
   try {
+    const normalizedEmail = normalizeEmail(req.body.email);
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
     // 1. Check if user already exists
-    const existingUser = await User.findOne({ email: req.body.email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists with this email!" });
     }
@@ -55,7 +62,7 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
     // 2. Create new user
     const newUser = new User({
       name: req.body.name,
-      email: req.body.email,
+      email: normalizedEmail,
       password: req.body.password, // In a real app, we would encrypt this!
       role: req.body.role || 'customer', // Default to customer
       phone: req.body.phone,
@@ -78,8 +85,13 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
 // LOGIN
 router.post('/login', async (req, res) => {
   try {
+    const normalizedEmail = normalizeEmail(req.body.email);
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
     // 1. Find user
-    const user = await User.findOne({ email: req.body.email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(404).json({ message: "User not found!" });
     }
@@ -95,6 +107,34 @@ router.post('/login', async (req, res) => {
     res.status(200).json({ token, user: userWithoutPassword });
   } catch (err) {
     res.status(500).json(err);
+  }
+});
+
+// FORGOT PASSWORD (Customer or Stall Staff)
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const newPassword = String(req.body.newPassword || '').trim();
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: 'Email and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({ message: 'Password has been reset successfully. Please sign in.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error resetting password.' });
   }
 });
 
