@@ -2,7 +2,7 @@ const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const User = require('../models/User');
-const { sendPasswordResetEmail, sendSignupVerificationEmail } = require('../utils/emailService');
+const { sendPasswordResetEmail, sendSignupVerificationEmail, sendTestEmail } = require('../utils/emailService');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -300,6 +300,29 @@ router.post('/forgot-password/verify-code', async (req, res) => {
     res.status(200).json({ message: 'Password has been reset successfully. Please sign in.' });
   } catch (err) {
     res.status(500).json({ message: 'Error resetting password.' });
+  }
+});
+
+// SMTP TEST EMAIL (Disabled in production unless explicitly allowed)
+router.post('/test-email', async (req, res) => {
+  try {
+    const allowInProduction = String(process.env.ALLOW_EMAIL_TEST_ENDPOINT || 'false').toLowerCase() === 'true';
+    if (process.env.NODE_ENV === 'production' && !allowInProduction) {
+      return res.status(403).json({ message: 'Test email endpoint is disabled in production.' });
+    }
+
+    const email = normalizeEmail(req.body.email);
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    await sendTestEmail(email);
+    return res.status(200).json({
+      message: 'Test email attempted. Check inbox/spam and server logs.',
+      maskedEmail: maskEmail(email)
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Unable to send test email.' });
   }
 });
 

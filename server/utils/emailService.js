@@ -92,7 +92,16 @@ const sendSignupVerificationEmail = async (recipientEmail, code) => {
   });
 };
 
+const sendTestEmail = async (recipientEmail) => {
+  await sendEmailMessage({
+    to: recipientEmail,
+    subject: 'ClickPick SMTP Test Email',
+    text: `SMTP test successful for ClickPick at ${new Date().toISOString()}.`
+  });
+};
+
 module.exports = {
   sendPasswordResetEmail,
-  sendSignupVerificationEmail
+  sendSignupVerificationEmail,
+  sendTestEmail
 };
