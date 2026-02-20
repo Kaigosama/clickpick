@@ -12,14 +12,7 @@ const UserSchema = new mongoose.Schema({
   phone: { type: String },
   gcashNumber: { type: String },
   logoUrl: { type: String },
-  logoPath: { type: String },
-  emailVerified: { type: Boolean, default: false },
-  emailVerificationCode: { type: String },
-  emailVerificationCodeExpiresAt: { type: Date },
-  emailVerificationCodeSentAt: { type: Date },
-  passwordResetCode: { type: String },
-  passwordResetCodeExpiresAt: { type: Date },
-  passwordResetCodeSentAt: { type: Date }
+  logoPath: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

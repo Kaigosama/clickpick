@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx'; // Import the Context
 import api from '../services/api'; // Import our centralized API service
@@ -6,16 +6,10 @@ import api from '../services/api'; // Import our centralized API service
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotMode, setIsForgotMode] = useState(false);
-  const [isEmailVerifyMode, setIsEmailVerifyMode] = useState(false);
-  const [resetCodeSent, setResetCodeSent] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [emailVerifyCode, setEmailVerifyCode] = useState('');
-  const [emailVerifyCooldown, setEmailVerifyCooldown] = useState(0);
   const [selectedRole, setSelectedRole] = useState(null); // User selects role first
   
   // Form State
   const [email, setEmail] = useState('');
-  const [resetCode, setResetCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState(''); 
@@ -25,123 +19,12 @@ const Auth = () => {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext); // Get the login function from global state
 
-  useEffect(() => {
-    if (resendCooldown <= 0) return undefined;
-
-    const timer = setInterval(() => {
-      setResendCooldown((current) => (current > 0 ? current - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [resendCooldown]);
-
-  useEffect(() => {
-    if (emailVerifyCooldown <= 0) return undefined;
-
-    const timer = setInterval(() => {
-      setEmailVerifyCooldown((current) => (current > 0 ? current - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [emailVerifyCooldown]);
-
-  const requestResetCode = async () => {
-    await api.post('/auth/forgot-password/request-code', { email });
-    setResetCodeSent(true);
-    setResendCooldown(30);
-  };
-
-  const handleResendCode = async () => {
-    if (!email) {
-      alert('Please enter your email address.');
-      return;
-    }
-
-    if (resendCooldown > 0) {
-      return;
-    }
-
-    try {
-      await requestResetCode();
-      setResetCode('');
-      alert('A new verification code was sent to your email.');
-    } catch (err) {
-      const message = err.response?.data?.message || 'Unable to resend verification code. Please try again.';
-      alert(message);
-    }
-  };
-
-  const handleResendEmailVerificationCode = async () => {
-    if (!email) {
-      alert('Please enter your email address.');
-      return;
-    }
-
-    if (emailVerifyCooldown > 0) {
-      return;
-    }
-
-    try {
-      await api.post('/auth/resend-verification-code', { email });
-      setEmailVerifyCode('');
-      setEmailVerifyCooldown(30);
-      alert('A new email verification code was sent.');
-    } catch (err) {
-      const message = err.response?.data?.message || 'Unable to resend verification code. Please try again.';
-      alert(message);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (isEmailVerifyMode) {
-      if (!email) {
-        alert('Please enter your email address.');
-        return;
-      }
-
-      if (!emailVerifyCode.trim()) {
-        alert('Please enter the verification code.');
-        return;
-      }
-
-      try {
-        await api.post('/auth/verify-email', { email, code: emailVerifyCode });
-        alert('Email verified successfully. You can now sign in.');
-        setIsEmailVerifyMode(false);
-        setIsLogin(true);
-        setEmailVerifyCode('');
-        setEmailVerifyCooldown(0);
-        setPassword('');
-        return;
-      } catch (err) {
-        const message = err.response?.data?.message || 'Unable to verify email. Please try again.';
-        alert(message);
-        return;
-      }
-    }
 
     if (isForgotMode) {
       if (!email) {
         alert('Please enter your email address.');
-        return;
-      }
-
-      if (!resetCodeSent) {
-        try {
-          await requestResetCode();
-          alert('Verification code sent. Please check your email.');
-          return;
-        } catch (err) {
-          const message = err.response?.data?.message || 'Unable to send verification code. Please try again.';
-          alert(message);
-          return;
-        }
-      }
-
-      if (!resetCode.trim()) {
-        alert('Please enter the verification code.');
         return;
       }
       if (!password || password.length < 6) {
@@ -154,17 +37,13 @@ const Auth = () => {
       }
 
       try {
-        await api.post('/auth/forgot-password/verify-code', {
+        await api.post('/auth/forgot-password', {
           email,
-          code: resetCode,
           newPassword: password
         });
         alert('Password reset successful. Please login with your new password.');
         setIsForgotMode(false);
         setIsLogin(true);
-        setResetCodeSent(false);
-        setResendCooldown(0);
-        setResetCode('');
         setPassword('');
         setConfirmPassword('');
         return;
@@ -233,40 +112,14 @@ const Auth = () => {
           navigate('/menu');
         }
       } else {
-        if (res.data?.requiresEmailVerification) {
-          setIsEmailVerifyMode(true);
-          setIsForgotMode(false);
-          setResetCodeSent(false);
-          setResendCooldown(0);
-          setEmail(email);
-          setEmailVerifyCode('');
-          setEmailVerifyCooldown(30);
-          setPassword('');
-          setConfirmPassword('');
-          alert(`${res.data.message || 'Registration successful. Please verify your email.'}${res.data.maskedEmail ? ` (${res.data.maskedEmail})` : ''}`);
-        } else {
-          setIsLogin(true);
-          setSelectedRole(null); // Reset role selection
-          alert("Registration Successful! Please Login.");
-          setPassword('');
-        }
+        setIsLogin(true);
+        setSelectedRole(null); // Reset role selection
+        alert("Registration Successful! Please Login.");
+        setPassword('');
       }
 
     } catch (err) {
       console.error("Auth Error:", err);
-      if (isLogin && err.response?.data?.needsEmailVerification) {
-        setIsEmailVerifyMode(true);
-        setIsForgotMode(false);
-        setResetCodeSent(false);
-        setResendCooldown(0);
-        setEmail(email);
-        setEmailVerifyCode('');
-        setEmailVerifyCooldown(30);
-        const message = err.response?.data?.message || 'Please verify your email first.';
-        const maskedEmail = err.response?.data?.maskedEmail;
-        alert(`${message}${maskedEmail ? ` (${maskedEmail})` : ''}`);
-        return;
-      }
       const message = err.response?.data?.message || "An error occurred. Please try again.";
       alert(message);
     }
@@ -329,7 +182,7 @@ const Auth = () => {
           <>
             {/* Input Form */}
             <form onSubmit={handleSubmit} className="w-full space-y-6">
-              {!isLogin && !isForgotMode && !isEmailVerifyMode && (
+              {!isLogin && !isForgotMode && (
                   <input 
                     type="text" 
                     placeholder={selectedRole === 'stall_staff' ? 'Store Name' : 'Full Name'} 
@@ -340,7 +193,7 @@ const Auth = () => {
                   />
               )}
 
-              {!isLogin && !isForgotMode && !isEmailVerifyMode && selectedRole === 'stall_staff' && (
+              {!isLogin && !isForgotMode && selectedRole === 'stall_staff' && (
                 <div className="w-full text-left">
                   <label className="block text-xs text-white/60 mb-2 uppercase tracking-[0.2em]">
                     Store Logo (optional)
@@ -359,12 +212,11 @@ const Auth = () => {
                 placeholder={selectedRole === 'customer' ? "Email (@mymail.mapua.edu.ph)" : "Email"} 
                 value={email} 
                 onChange={e => setEmail(e.target.value)} 
-                disabled={isEmailVerifyMode}
                 required
-                className={`w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all ${isEmailVerifyMode ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
               />
 
-              {!isLogin && !isForgotMode && !isEmailVerifyMode && selectedRole === 'customer' && (
+              {!isLogin && !isForgotMode && selectedRole === 'customer' && (
                 <input
                   type="tel"
                   placeholder="Phone Number"
@@ -378,24 +230,17 @@ const Auth = () => {
               <div className="relative w-full">
                 <input 
                   type="password"
-                  placeholder={isEmailVerifyMode ? 'Password not needed for verification' : (isForgotMode && !resetCodeSent ? 'Password (after code)' : (isForgotMode ? 'New Password' : 'Password'))}
+                  placeholder={isForgotMode ? 'New Password' : 'Password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  disabled={isEmailVerifyMode || (isForgotMode && !resetCodeSent)}
-                  required={!isEmailVerifyMode}
-                  className={`w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all ${(isEmailVerifyMode || (isForgotMode && !resetCodeSent)) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  required
+                  className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
                 />
                 {isLogin && !isForgotMode && (
                   <button
                     type="button"
                     onClick={() => {
                       setIsForgotMode(true);
-                      setResetCodeSent(false);
-                      setResendCooldown(0);
-                      setIsEmailVerifyMode(false);
-                      setEmailVerifyCode('');
-                      setEmailVerifyCooldown(0);
-                      setResetCode('');
                       setPassword('');
                       setConfirmPassword('');
                     }}
@@ -406,24 +251,8 @@ const Auth = () => {
                 )}
               </div>
 
-              {isForgotMode && resetCodeSent && (
+              {isForgotMode && (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Verification Code"
-                    value={resetCode}
-                    onChange={e => setResetCode(e.target.value)}
-                    required
-                    className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleResendCode}
-                    disabled={resendCooldown > 0}
-                    className={`w-full bg-transparent border border-white/30 py-3 text-white font-semibold transition-all uppercase tracking-[0.1em] text-xs active:scale-95 ${resendCooldown > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                  >
-                    {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : 'Resend Verification Code'}
-                  </button>
                   <input
                     type="password"
                     placeholder="Confirm New Password"
@@ -435,34 +264,11 @@ const Auth = () => {
                 </>
               )}
 
-              {isEmailVerifyMode && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Email Verification Code"
-                    value={emailVerifyCode}
-                    onChange={e => setEmailVerifyCode(e.target.value)}
-                    required
-                    className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleResendEmailVerificationCode}
-                    disabled={emailVerifyCooldown > 0}
-                    className={`w-full bg-transparent border border-white/30 py-3 text-white font-semibold transition-all uppercase tracking-[0.1em] text-xs active:scale-95 ${emailVerifyCooldown > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
-                  >
-                    {emailVerifyCooldown > 0 ? `Resend Code in ${emailVerifyCooldown}s` : 'Resend Verification Code'}
-                  </button>
-                </>
-              )}
-
               <div className="pt-8 space-y-4">
                 <button type="submit" className="w-full bg-white py-4 text-black font-black hover:bg-gray-200 transition-all uppercase tracking-[0.2em] text-sm active:scale-95">
-                  {isEmailVerifyMode
-                    ? 'Verify Email'
-                    : (isForgotMode ? (resetCodeSent ? 'Verify & Reset Password' : 'Send Verification Code') : (isLogin ? 'Sign In' : 'Create Account'))}
+                  {isForgotMode ? 'Reset Password' : (isLogin ? 'Sign In' : 'Create Account')}
                 </button>
-                {!isForgotMode && !isEmailVerifyMode ? (
+                {!isForgotMode ? (
                   <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full bg-transparent border border-white/30 py-4 text-white font-semibold hover:bg-white/10 transition-all uppercase tracking-[0.1em] text-xs active:scale-95">
                     {isLogin ? 'Register' : 'Back to Login'}
                   </button>
@@ -471,18 +277,12 @@ const Auth = () => {
                     type="button"
                     onClick={() => {
                       setIsForgotMode(false);
-                      setIsEmailVerifyMode(false);
-                      setResetCodeSent(false);
-                      setResendCooldown(0);
-                      setEmailVerifyCode('');
-                      setEmailVerifyCooldown(0);
-                      setResetCode('');
                       setPassword('');
                       setConfirmPassword('');
                     }}
                     className="w-full bg-transparent border border-white/30 py-4 text-white font-semibold hover:bg-white/10 transition-all uppercase tracking-[0.1em] text-xs active:scale-95"
                   >
-                    {isEmailVerifyMode ? 'Cancel Verification' : 'Back to Login'}
+                    Back to Login
                   </button>
                 )}
                 <button 
@@ -491,13 +291,7 @@ const Auth = () => {
                     setSelectedRole(null);
                     setIsLogin(true);
                     setIsForgotMode(false);
-                    setIsEmailVerifyMode(false);
-                    setResetCodeSent(false);
-                    setResendCooldown(0);
-                    setEmailVerifyCode('');
-                    setEmailVerifyCooldown(0);
                     setEmail('');
-                    setResetCode('');
                     setPassword('');
                     setConfirmPassword('');
                     setName('');
