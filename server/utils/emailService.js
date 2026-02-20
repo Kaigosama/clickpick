@@ -1,4 +1,6 @@
 const nodemailer = require('nodemailer');
+const path = require('path');
+const dotenv = require('dotenv');
 
 const maskEmail = (value) => {
   const email = String(value || '').trim().toLowerCase();
@@ -12,6 +14,11 @@ const maskEmail = (value) => {
 };
 
 const getSmtpConfig = () => {
+  const hasCoreSmtpConfig = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  if (!hasCoreSmtpConfig) {
+    dotenv.config({ path: path.join(__dirname, '../.env') });
+  }
+
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const secure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
