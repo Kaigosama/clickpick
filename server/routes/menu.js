@@ -1,27 +1,10 @@
 const router = require('express').Router();
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const MenuItem = require('../models/MenuItem');
 const { emitMenuUpdated } = require('../socket');
 
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'menu-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -120,6 +103,13 @@ const normalizePrice = (value, fallback = 0) => {
   return Math.max(0, parsed);
 };
 
+const toImageDataUrl = (file) => {
+  if (!file || !file.buffer || !file.mimetype) {
+    return null;
+  }
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+};
+
 // GET ALL MENU ITEMS (For Customers)
 router.get('/', async (req, res) => {
   try {
@@ -164,7 +154,7 @@ router.post('/', uploadImageIfMultipart, async (req, res) => {
       withRiceAdditionalPrice: isMainCategory && withRiceAvailable
         ? normalizePrice(req.body.withRiceAdditionalPrice, 15)
         : 0,
-      image: req.file ? `/uploads/${req.file.filename}` : req.body.image
+      image: req.file ? toImageDataUrl(req.file) : req.body.image
     };
     const newItem = new MenuItem(payload);
     const savedItem = await newItem.save();
@@ -230,7 +220,7 @@ router.put('/:id', uploadImageIfMultipart, async (req, res) => {
       payload.isAvailable = quantity > 0;
     }
     if (req.file) {
-      payload.image = `/uploads/${req.file.filename}`;
+      payload.image = toImageDataUrl(req.file);
     }
     const updatedItem = await MenuItem.findByIdAndUpdate(
       req.params.id,

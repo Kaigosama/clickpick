@@ -967,7 +967,10 @@ const StallMenu = () => {
                         {payment.proofOfPaymentUrl ? (
                           <div className="relative">
                             {(() => {
-                              const proofImageUrl = `${toServerAssetUrl(payment.proofOfPaymentUrl)}?payment=${payment._id}&t=${new Date(payment.createdAt || Date.now()).getTime()}`;
+                              const resolvedProofUrl = toServerAssetUrl(payment.proofOfPaymentUrl);
+                              const proofImageUrl = resolvedProofUrl.startsWith('data:')
+                                ? resolvedProofUrl
+                                : `${resolvedProofUrl}?payment=${payment._id}&t=${new Date(payment.createdAt || Date.now()).getTime()}`;
                               return (
                                 <>
                             <img 

@@ -2,9 +2,6 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const SequenceCounter = require('../models/SequenceCounter');
@@ -78,25 +75,8 @@ const getNextOrderIdentifiers = async (stallId) => {
   return { orderNumber, queueNumber };
 };
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${crypto.randomUUID()}`;
-    cb(null, `gcash-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     // Accept only image files
@@ -107,6 +87,13 @@ const upload = multer({
     }
   }
 });
+
+const toImageDataUrl = (file) => {
+  if (!file || !file.buffer || !file.mimetype) {
+    return null;
+  }
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+};
 
 // Upload GCash proof of payment
 router.post('/gcash-upload', upload.single('file'), async (req, res) => {
@@ -210,8 +197,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       paymentMethod: 'gcash',
       amount: totalAmount || req.body.amount || 0,
       status: 'pending',
-      proofOfPaymentPath: req.file.path,
-      proofOfPaymentUrl: `/uploads/${req.file.filename}`
+      proofOfPaymentUrl: toImageDataUrl(req.file)
     });
 
     await payment.save();
@@ -225,13 +211,6 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     });
   } catch (err) {
     console.error('GCash upload error:', err);
-    
-    // Delete file if save fails
-    if (req.file) {
-      fs.unlink(req.file.path, (unlinkErr) => {
-        if (unlinkErr) console.error('File deletion error:', unlinkErr);
-      });
-    }
 
     res.status(500).json({ 
       message: 'Upload failed: ' + err.message 

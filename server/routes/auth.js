@@ -1,27 +1,10 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const User = require('../models/User');
 
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -38,6 +21,13 @@ const uploadLogoIfMultipart = (req, res, next) => {
     return;
   }
   next();
+};
+
+const toImageDataUrl = (file) => {
+  if (!file || !file.buffer || !file.mimetype) {
+    return null;
+  }
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 };
 
 // Helper function to generate JWT
@@ -70,8 +60,7 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
       role: req.body.role || 'customer', // Default to customer
       phone: req.body.phone,
       gcashNumber: req.body.gcashNumber,
-      logoUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
-      logoPath: req.file ? req.file.path : undefined
+      logoUrl: req.file ? toImageDataUrl(req.file) : undefined
     });
 
     // 3. Save to Database
@@ -152,8 +141,7 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
       update.password = String(newPassword).trim();
     }
     if (req.file) {
-      update.logoUrl = `/uploads/${req.file.filename}`;
-      update.logoPath = req.file.path;
+      update.logoUrl = toImageDataUrl(req.file);
     }
 
     const updatedUser = await User.findByIdAndUpdate(

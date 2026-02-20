@@ -18,6 +18,9 @@ export const SERVER_BASE_URL = buildServerBaseUrl();
 
 export const toServerAssetUrl = (assetPath) => {
   if (!assetPath) return null;
+  if (assetPath.startsWith('data:')) {
+    return assetPath;
+  }
   if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) {
     return assetPath;
   }
