@@ -2,6 +2,7 @@ const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const User = require('../models/User');
+const { sendPasswordResetEmail, sendSignupVerificationEmail } = require('../utils/emailService');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -31,6 +32,16 @@ const toImageDataUrl = (file) => {
 };
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const generateResetCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateVerificationCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const RESET_CODE_COOLDOWN_MS = 30 * 1000;
+const EMAIL_VERIFICATION_COOLDOWN_MS = 30 * 1000;
+
+const applyEmailVerificationCode = (user) => {
+  user.emailVerificationCode = generateVerificationCode();
+  user.emailVerificationCodeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  user.emailVerificationCodeSentAt = new Date();
+};
 
 // Helper function to generate JWT
 const generateToken = (userId) => {
@@ -67,16 +78,22 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
       role: req.body.role || 'customer', // Default to customer
       phone: req.body.phone,
       gcashNumber: req.body.gcashNumber,
-      logoUrl: req.file ? toImageDataUrl(req.file) : undefined
+      logoUrl: req.file ? toImageDataUrl(req.file) : undefined,
+      emailVerified: false
     });
+
+    applyEmailVerificationCode(newUser);
 
     // 3. Save to Database
     const savedUser = await newUser.save();
-    const { password, ...userWithoutPassword } = savedUser._doc;
-    
-    // 4. Generate and return token
-    const token = generateToken(savedUser._id);
-    res.status(201).json({ token, user: userWithoutPassword });
+
+    await sendSignupVerificationEmail(savedUser.email, savedUser.emailVerificationCode);
+
+    res.status(201).json({
+      requiresEmailVerification: true,
+      email: savedUser.email,
+      message: 'Registration successful. Verification code sent to your email.'
+    });
   } catch (err) {
     res.status(500).json(err);
   }
@@ -101,6 +118,14 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: "Wrong credentials!" });
     }
 
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        message: 'Please verify your email before signing in.',
+        needsEmailVerification: true,
+        email: user.email
+      });
+    }
+
     // 3. Generate token and return user info (excluding password)
     const { password, ...userWithoutPassword } = user._doc;
     const token = generateToken(user._id);
@@ -110,14 +135,134 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// FORGOT PASSWORD (Customer or Stall Staff)
-router.post('/forgot-password', async (req, res) => {
+// VERIFY SIGNUP EMAIL CODE
+router.post('/verify-email', async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
+    const code = String(req.body.code || '').trim();
+
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and code are required.' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({ message: 'Email is already verified.' });
+    }
+
+    const isCodeMatch = String(user.emailVerificationCode || '') === code;
+    const isCodeExpired = !user.emailVerificationCodeExpiresAt || new Date(user.emailVerificationCodeExpiresAt).getTime() < Date.now();
+
+    if (!isCodeMatch || isCodeExpired) {
+      return res.status(400).json({ message: 'Invalid or expired verification code.' });
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationCode = null;
+    user.emailVerificationCodeExpiresAt = null;
+    user.emailVerificationCodeSentAt = null;
+    await user.save();
+
+    res.status(200).json({ message: 'Email verified successfully. You can now sign in.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error verifying email.' });
+  }
+});
+
+// RESEND SIGNUP EMAIL VERIFICATION CODE
+router.post('/resend-verification-code', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ message: 'Email is already verified.' });
+    }
+
+    const lastSentAtMs = user.emailVerificationCodeSentAt
+      ? new Date(user.emailVerificationCodeSentAt).getTime()
+      : 0;
+    const elapsedMs = Date.now() - lastSentAtMs;
+
+    if (lastSentAtMs && elapsedMs < EMAIL_VERIFICATION_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil((EMAIL_VERIFICATION_COOLDOWN_MS - elapsedMs) / 1000);
+      return res.status(429).json({
+        message: `Please wait ${retryAfterSeconds}s before requesting another code.`
+      });
+    }
+
+    applyEmailVerificationCode(user);
+    await user.save();
+
+    await sendSignupVerificationEmail(user.email, user.emailVerificationCode);
+
+    res.status(200).json({ message: 'Verification code sent to your email.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error sending verification code.' });
+  }
+});
+
+// REQUEST PASSWORD RESET CODE (Customer or Stall Staff)
+router.post('/forgot-password/request-code', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const lastSentAtMs = user.passwordResetCodeSentAt
+      ? new Date(user.passwordResetCodeSentAt).getTime()
+      : 0;
+    const elapsedMs = Date.now() - lastSentAtMs;
+
+    if (lastSentAtMs && elapsedMs < RESET_CODE_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil((RESET_CODE_COOLDOWN_MS - elapsedMs) / 1000);
+      return res.status(429).json({
+        message: `Please wait ${retryAfterSeconds}s before requesting another code.`
+      });
+    }
+
+    const resetCode = generateResetCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.passwordResetCode = resetCode;
+    user.passwordResetCodeExpiresAt = expiresAt;
+    user.passwordResetCodeSentAt = new Date();
+    await user.save();
+
+    await sendPasswordResetEmail(user.email, resetCode);
+
+    res.status(200).json({ message: 'Verification code sent to your email.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error sending verification code.' });
+  }
+});
+
+// VERIFY PASSWORD RESET CODE AND UPDATE PASSWORD
+router.post('/forgot-password/verify-code', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const code = String(req.body.code || '').trim();
     const newPassword = String(req.body.newPassword || '').trim();
 
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: 'Email and new password are required.' });
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: 'Email, code, and new password are required.' });
     }
 
     if (newPassword.length < 6) {
@@ -129,7 +274,16 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
+    const isCodeMatch = String(user.passwordResetCode || '') === code;
+    const isCodeExpired = !user.passwordResetCodeExpiresAt || new Date(user.passwordResetCodeExpiresAt).getTime() < Date.now();
+
+    if (!isCodeMatch || isCodeExpired) {
+      return res.status(400).json({ message: 'Invalid or expired verification code.' });
+    }
+
     user.password = newPassword;
+    user.passwordResetCode = null;
+    user.passwordResetCodeExpiresAt = null;
     await user.save();
 
     res.status(200).json({ message: 'Password has been reset successfully. Please sign in.' });
