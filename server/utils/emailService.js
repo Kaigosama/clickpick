@@ -30,6 +30,15 @@ const getSmtpConfig = () => {
   };
 };
 
+const getMissingSmtpKeys = (config) => {
+  const missing = [];
+  if (!config.host) missing.push('SMTP_HOST');
+  if (!config.user) missing.push('SMTP_USER');
+  if (!config.pass) missing.push('SMTP_PASS');
+  if (!config.from) missing.push('SMTP_FROM');
+  return missing;
+};
+
 const getTransporter = () => {
   const config = getSmtpConfig();
 
@@ -65,7 +74,11 @@ const sendEmailMessage = async ({ to, subject, text }) => {
   const transporter = getTransporter();
 
   if (!transporter) {
+    const missingSmtpKeys = getMissingSmtpKeys(config);
     console.log('--- EMAIL SIMULATION (SMTP not configured) ---');
+    if (missingSmtpKeys.length > 0) {
+      console.log(`Missing SMTP keys: ${missingSmtpKeys.join(', ')}`);
+    }
     console.log(`To: ${maskEmail(to)}`);
     console.log(`Subject: ${subject}`);
     console.log(`Message: ${text}`);
