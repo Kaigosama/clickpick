@@ -69,8 +69,6 @@ const Kitchen = () => {
     if (!user?._id) return;
     try {
       const res = await api.get(`/payments/pending-payments?stallId=${user._id}`);
-      console.log('Pending payments response:', res.data);
-      console.log('Payments array:', res.data.payments);
       setPendingPayments(res.data.payments || []);
     } catch (err) {
       console.error("Error fetching pending payments", err);

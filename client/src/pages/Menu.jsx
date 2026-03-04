@@ -9,7 +9,7 @@ import { toServerAssetUrl } from '../services/assetUrl.js';
 const Menu = () => {
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
-  const { cartItems, removeFromCart, addToCart, cartTotal, clearCart } = useCart();
+  const { cartItems, cartTotal } = useCart();
   const [showCartPreview, setShowCartPreview] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
@@ -51,52 +51,6 @@ const Menu = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
-  };
-
-  const resolveStoreId = (item) => {
-    const rawStoreId = item?.stallId ?? item?.stall;
-    if (rawStoreId && typeof rawStoreId === 'object') {
-      return String(rawStoreId._id || rawStoreId.id || rawStoreId.stallId || '');
-    }
-    return String(rawStoreId || '');
-  };
-
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) {
-      alert("Cart is empty!");
-      return;
-    }
-
-    const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
-    if (storeIdsInCart.length > 1) {
-      alert('Please place separate orders per store. Your cart currently has items from multiple stores.');
-      return;
-    }
-
-    try {
-      const api = (await import('../services/api.js')).default;
-      const orderData = {
-        customerId: user._id,
-        items: cartItems.map(item => ({
-          menuItemId: item._id,
-          name: item.name,
-          variation: item.selectedVariation || '',
-          riceOption: item.selectedRiceOption || '',
-          quantity: item.quantity || 1,
-          price: item.price
-        })),
-        totalAmount: cartTotal,
-        paymentMethod: 'cash'
-      };
-
-      await api.post('/orders', orderData);
-      alert("Order Placed Successfully! Your order number will be displayed.");
-      clearCart();
-      navigate('/my-orders');
-    } catch (err) {
-      console.error(err);
-      alert("Checkout Failed: " + (err.response?.data?.message || err.message));
-    }
   };
 
   return (

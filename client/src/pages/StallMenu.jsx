@@ -220,7 +220,6 @@ const StallMenu = () => {
       const fetchPendingPayments = async () => {
         try {
           const res = await api.get(`/payments/pending-payments?stallId=${user._id}`);
-          console.log('Fetched pending payments:', res.data);
           setPendingPayments(res.data.payments || []);
         } catch (err) {
           console.error('Error fetching pending payments:', err);

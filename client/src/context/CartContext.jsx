@@ -7,11 +7,22 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
 
-  const getCartItemKey = (itemOrId, selectedVariation = '') => {
+  const buildKey = (id, variation = '', rice = '') => `${id}::${variation}::${rice}`;
+
+  const getCartItemKey = (item) =>
+    buildKey(item?._id, item?.selectedVariation || '', item?.selectedRiceOption || '');
+
+  const parseTarget = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
     if (typeof itemOrId === 'object' && itemOrId !== null) {
-      return `${itemOrId._id}::${itemOrId.selectedVariation || ''}::${itemOrId.selectedRiceOption || ''}`;
+      return { mode: 'exact', id: itemOrId._id, key: getCartItemKey(itemOrId) };
     }
-    return `${itemOrId}::${selectedVariation || ''}`;
+
+    const id = itemOrId;
+    const hasOptions = Boolean(selectedVariation || selectedRiceOption);
+
+    return hasOptions
+      ? { mode: 'exact', id, key: buildKey(id, selectedVariation, selectedRiceOption) }
+      : { mode: 'idOnly', id, key: null };
   };
 
   // Add item to cart
@@ -29,29 +40,57 @@ export const CartProvider = ({ children }) => {
   };
 
   // Remove item from cart
-  const removeFromCart = (itemOrId, selectedVariation = '') => {
-    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
-    setCartItems((prevItems) => prevItems.filter((item) => getCartItemKey(item) !== cartItemKey));
+  const removeFromCart = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+
+    setCartItems((prevItems) =>
+      prevItems.filter((item) => {
+        if (target.mode === 'idOnly') return item._id !== target.id;
+        return getCartItemKey(item) !== target.key;
+      })
+    );
   };
 
   // Decrease quantity or remove if 0
-  const decreaseQuantity = (itemOrId, selectedVariation = '') => {
-    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
-    setCartItems((prevItems) => 
-      prevItems.map(item => 
-        getCartItemKey(item) === cartItemKey ? { ...item, quantity: item.quantity - 1 } : item
-      ).filter(item => item.quantity > 0)
-    );
+  const decreaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+
+    setCartItems((prevItems) => {
+      if (target.mode === 'idOnly') {
+        const index = prevItems.findIndex((item) => item._id === target.id);
+        if (index === -1) return prevItems;
+
+        const nextItems = [...prevItems];
+        nextItems[index] = { ...nextItems[index], quantity: nextItems[index].quantity - 1 };
+        return nextItems.filter((item) => item.quantity > 0);
+      }
+
+      return prevItems
+        .map((item) =>
+          getCartItemKey(item) === target.key ? { ...item, quantity: item.quantity - 1 } : item
+        )
+        .filter((item) => item.quantity > 0);
+    });
   };
 
   // Increase quantity
-  const increaseQuantity = (itemOrId, selectedVariation = '') => {
-    const cartItemKey = getCartItemKey(itemOrId, selectedVariation);
-    setCartItems((prevItems) =>
-      prevItems.map(item =>
-        getCartItemKey(item) === cartItemKey ? { ...item, quantity: item.quantity + 1 } : item
-      )
-    );
+  const increaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+
+    setCartItems((prevItems) => {
+      if (target.mode === 'idOnly') {
+        const index = prevItems.findIndex((item) => item._id === target.id);
+        if (index === -1) return prevItems;
+
+        const nextItems = [...prevItems];
+        nextItems[index] = { ...nextItems[index], quantity: nextItems[index].quantity + 1 };
+        return nextItems;
+      }
+
+      return prevItems.map((item) =>
+        getCartItemKey(item) === target.key ? { ...item, quantity: item.quantity + 1 } : item
+      );
+    });
   };
 
   // Clear cart (after successful order)
