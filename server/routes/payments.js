@@ -7,6 +7,7 @@ const Order = require('../models/Order');
 const SequenceCounter = require('../models/SequenceCounter');
 const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
+const Transaction = require('../models/Transaction');
 const { sendStatusSMS } = require('../utils/smsService');
 
 const getRequesterFromToken = async (req) => {
@@ -202,6 +203,17 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
 
     await payment.save();
 
+    // D3: Record GCash transaction (pending until staff approves)
+    await Transaction.create({
+      orderId: savedOrder._id,
+      customerId: customerId,
+      stallId: effectiveStallId,
+      amount: totalAmount || req.body.amount || 0,
+      paymentMethod: 'gcash',
+      status: 'pending',
+      notes: `Payment ref: ${payment._id}`
+    });
+
     res.json({
       success: true,
       message: 'Proof of payment uploaded successfully',
@@ -299,6 +311,11 @@ router.post('/gcash-approve/:paymentId', async (req, res) => {
           await sendStatusSMS(customer.phone, updatedOrder.orderNumber || updatedOrder.queueNumber, 'approved', storeName);
         }
       }
+      // D3: Mark transaction as completed on payment approval
+      await Transaction.findOneAndUpdate(
+        { orderId: payment.orderDbId },
+        { $set: { status: 'completed' } }
+      );
     }
 
     res.json({
@@ -386,6 +403,11 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
           await sendStatusSMS(customer.phone, order.orderNumber || order.queueNumber, 'rejected', storeName);
         }
       }
+      // D3: Mark transaction as rejected on payment rejection
+      await Transaction.findOneAndUpdate(
+        { orderId: payment.orderDbId },
+        { $set: { status: 'rejected' } }
+      );
     }
 
     res.json({

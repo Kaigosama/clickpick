@@ -1,7 +1,10 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const multer = require('multer');
 const User = require('../models/User');
+
+const SALT_ROUNDS = 10;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -60,10 +63,11 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
     }
 
     // 2. Create new user
+    const hashedPassword = await bcrypt.hash(req.body.password, SALT_ROUNDS);
     const newUser = new User({
       name: req.body.name,
       email: normalizedEmail,
-      password: req.body.password, // In a real app, we would encrypt this!
+      password: hashedPassword,
       role: req.body.role || 'customer', // Default to customer
       phone: req.body.phone,
       gcashNumber: req.body.gcashNumber,
@@ -96,8 +100,9 @@ router.post('/login', async (req, res) => {
       return res.status(404).json({ message: "User not found!" });
     }
 
-    // 2. Check password (Simple check for now)
-    if (user.password !== req.body.password) {
+    // 2. Check password
+    const isMatch = await bcrypt.compare(req.body.password, user.password);
+    if (!isMatch) {
       return res.status(400).json({ message: "Wrong credentials!" });
     }
 
@@ -129,7 +134,7 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ message: 'Email does not exist.' });
     }
 
-    user.password = newPassword;
+    user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await user.save();
 
     res.status(200).json({ message: 'Password has been reset successfully. Please sign in.' });
@@ -178,7 +183,7 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
       if (String(newPassword).trim().length < 6) {
         return res.status(400).json({ message: 'Password must be at least 6 characters.' });
       }
-      update.password = String(newPassword).trim();
+      update.password = await bcrypt.hash(String(newPassword).trim(), SALT_ROUNDS);
     }
     if (req.file) {
       update.logoUrl = toImageDataUrl(req.file);

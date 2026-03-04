@@ -7,6 +7,8 @@ const Order = require('../models/Order');
 const SequenceCounter = require('../models/SequenceCounter');
 const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
+const Transaction = require('../models/Transaction');
+const SalesReport = require('../models/SalesReport');
 const { sendStatusSMS } = require('../utils/smsService');
 const { GRACE_PERIOD_MINUTES, processExpiredReadyOrders } = require('../utils/orderGraceService');
 
@@ -233,6 +235,23 @@ router.get('/report/daily', async (req, res) => {
       });
     });
 
+    // D5: Persist sales report to database (upsert by stall + date)
+    const effectiveStallId = requester?.role === 'stall_staff' ? requester._id : (req.query.stallId || null);
+    if (effectiveStallId) {
+      await SalesReport.findOneAndUpdate(
+        { stallId: effectiveStallId, reportDate: today },
+        {
+          $set: {
+            totalOrders: orders.length,
+            totalRevenue,
+            itemsSold: itemBreakdown,
+            generatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+    }
+
     res.status(200).json({
       date: today.toDateString(),
       totalOrders: orders.length,
@@ -322,6 +341,16 @@ router.post('/', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
+    // D3: Record transaction for cash orders
+    await Transaction.create({
+      orderId: savedOrder._id,
+      customerId: savedOrder.customerId,
+      stallId: resolvedStallId,
+      amount: savedOrder.totalAmount,
+      paymentMethod: savedOrder.paymentMethod,
+      status: 'pending'
+    });
+
     const customer = await User.findById(savedOrder.customerId);
     if (customer?.phone) {
       await sendStatusSMS(customer.phone, savedOrder.orderNumber || savedOrder.queueNumber, 'pending', storeName);
@@ -388,6 +417,20 @@ router.put('/:id', async (req, res) => {
       { $set: updateData },
       { returnDocument: 'after' }
     ).populate('customerId', 'name phone');
+
+    // D3: Sync transaction status
+    if (req.body.status) {
+      const nextStatus = String(req.body.status).toLowerCase();
+      let txStatus = null;
+      if (nextStatus === 'completed') txStatus = 'completed';
+      else if (nextStatus === 'cancelled') txStatus = 'cancelled';
+      if (txStatus) {
+        await Transaction.findOneAndUpdate(
+          { orderId: updatedOrder._id },
+          { $set: { status: txStatus } }
+        );
+      }
+    }
 
     if (req.body.status) {
       const phone = updatedOrder.customerId?.phone;
