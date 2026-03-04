@@ -34,6 +34,7 @@ const toImageDataUrl = (file) => {
 };
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 // Helper function to generate JWT
 const generateToken = (userId) => {
@@ -50,6 +51,9 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
     const normalizedEmail = normalizeEmail(req.body.email);
     if (!normalizedEmail) {
       return res.status(400).json({ message: 'Email is required.' });
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
 
     // 1. Check if user already exists
@@ -93,6 +97,9 @@ router.post('/login', async (req, res) => {
     if (!normalizedEmail) {
       return res.status(400).json({ message: 'Email is required.' });
     }
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
 
     // 1. Find user
     const user = await User.findOne({ email: normalizedEmail });
@@ -123,6 +130,9 @@ router.post('/forgot-password', async (req, res) => {
 
     if (!email || !newPassword) {
       return res.status(400).json({ message: 'Email and new password are required.' });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
 
     if (newPassword.length < 6) {

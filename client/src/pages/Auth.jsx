@@ -54,7 +54,12 @@ const Auth = () => {
       }
     }
 
-    // 1. Validation Logic - Only check Mapúa email for customers
+    // 1. Validation Logic
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
     if (!isLogin && selectedRole === 'customer' && !email.endsWith('@mymail.mapua.edu.ph')) {
       alert("Please use your Mapúa institutional email (@mymail.mapua.edu.ph).");
       return;
