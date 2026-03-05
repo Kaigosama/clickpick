@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
+import CustomerHeader from '../components/CustomerHeader.jsx';
 import api from '../services/api.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
 
@@ -165,93 +166,67 @@ const Profile = () => {
         />
       )}
 
-      <header className="bg-[#8B0000] text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-            <span className="text-xl font-bold">{isStaff ? 'ClickPick Canteen Dashboard' : 'ClickPick'}</span>
-          </div>
-
-          <div className="sm:hidden relative">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
-                {user?.name || (isStaff ? 'Staff' : 'User')}
-              </p>
-              <button
-                onClick={() => setShowMobileNavMenu(!showMobileNavMenu)}
-                className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
-                aria-label="Open navigation menu"
-              >
-                ☰
-              </button>
+      {isStaff ? (
+        <header className="bg-[#8B0000] text-white shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
+              <span className="text-xl font-bold">ClickPick Canteen Dashboard</span>
             </div>
 
-            {showMobileNavMenu && (
-              <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48 overflow-hidden">
+            <div className="sm:hidden relative">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
+                  {user?.name || 'Staff'}
+                </p>
                 <button
-                  onClick={() => {
-                    if (isStaff) {
-                      const stallId = user?.stallId || user?._id;
-                      navigate(`/stall/${stallId}`);
-                    } else {
-                      navigate('/menu');
-                    }
-                    setShowMobileNavMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  onClick={() => setShowMobileNavMenu(!showMobileNavMenu)}
+                  className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
+                  aria-label="Open navigation menu"
                 >
-                  {isStaff ? 'Dashboard' : 'Stores'}
-                </button>
-                {!isStaff && (
-                  <>
-                    <button
-                      onClick={() => {
-                        navigate('/my-orders');
-                        setShowMobileNavMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      My Orders
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/order-history');
-                        setShowMobileNavMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Order History
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => {
-                    setShowMobileNavMenu(false);
-                    handleLogout();
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                >
-                  Logout
+                  ☰
                 </button>
               </div>
-            )}
-          </div>
 
-          <button
-            onClick={() => {
-              if (isStaff) {
+              {showMobileNavMenu && (
+                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      const stallId = user?.stallId || user?._id;
+                      navigate(`/stall/${stallId}`);
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMobileNavMenu(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
                 const stallId = user?.stallId || user?._id;
                 navigate(`/stall/${stallId}`);
-              } else {
-                navigate('/menu');
-              }
-            }}
-            className="hidden sm:inline text-white hover:opacity-80 font-semibold"
-          >
-            ← {isStaff ? 'Back to Dashboard' : 'Back to Stores'}
-          </button>
-        </div>
-      </header>
+              }}
+              className="hidden sm:inline text-white hover:opacity-80 font-semibold"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+        </header>
+      ) : (
+        <CustomerHeader activePage="profile" />
+      )}
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8">

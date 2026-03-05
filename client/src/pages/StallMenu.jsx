@@ -729,6 +729,12 @@ const StallMenu = () => {
               >
                 MY ORDERS
               </button>
+              <button
+                onClick={() => navigate('/order-history')}
+                className="hover:opacity-80 font-semibold text-lg"
+              >
+                ORDER HISTORY
+              </button>
             </nav>
 
             <div className="flex items-center gap-3 sm:gap-6">
@@ -1756,107 +1762,113 @@ const StallMenu = () => {
                                     setSelectedProduct(item);
                                   }
                                 }}
-                                className={`bg-white rounded-lg border-2 border-gray-300 shadow-lg transition-shadow overflow-hidden flex flex-col self-start ${isStoreClosedForCustomer ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-xl hover:border-[#8B0000]'}`}
+                                className={`bg-white rounded-lg border-2 sm:border-4 border-gray-300 shadow transition-all overflow-hidden flex flex-col self-start ${isStoreClosedForCustomer ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-lg hover:border-[#8B0000]'}`}
                               >
-                                <div className="bg-[#8B0000] w-full max-w-[110px] sm:max-w-none aspect-square mx-auto sm:mx-0 flex items-center justify-center text-2xl sm:text-5xl border-b-2 border-gray-300 overflow-hidden p-1">
-                                  {item.image ? (
-                                    <img
-                                      src={resolveItemImage(item.image)}
-                                      alt={item.name}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <span className="text-sm font-semibold uppercase">Img</span>
-                                  )}
-                                </div>
-                                
-                                <div className="p-2 sm:p-4 flex flex-col flex-1 min-w-0">
-                                  <h3 className="text-base sm:text-lg font-bold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
+                                <div className="p-2 sm:p-6 flex flex-col items-center gap-2 sm:gap-3 w-full">
+                                  <div className="w-full aspect-square max-w-[110px] sm:max-w-none bg-gray-100 rounded-md flex items-center justify-center overflow-hidden">
+                                    {item.image ? (
+                                      <img
+                                        src={resolveItemImage(item.image)}
+                                        alt={item.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <span className="text-sm font-semibold uppercase text-gray-500">Img</span>
+                                    )}
+                                  </div>
+
+                                  <div className="w-full min-w-0 flex flex-col flex-1">
+                                    <h3 className="text-sm sm:text-lg font-semibold text-gray-900 text-center w-full min-h-[2.75rem] sm:min-h-[3.5rem] max-h-[2.75rem] sm:max-h-[3.5rem] overflow-hidden flex items-center justify-center leading-tight break-words">
                                     {item.name}
-                                  </h3>
-                                  <p className={`text-sm sm:text-xs italic text-gray-700 text-center mt-1 min-h-[2rem] sm:min-h-[2.5rem] line-clamp-2 ${variationNames ? '' : 'opacity-0'}`}>
-                                    {variationNames || 'No variation'}
-                                  </p>
-                                  <p className="text-xl sm:text-2xl font-bold text-gray-900 my-1 sm:my-2">₱{item.price}</p>
-                                  
-                                  <p className={`text-sm sm:text-xs mb-2 sm:mb-3 text-center font-semibold ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
-                                    {isAvailable ? `Available: ${availableQty}` : 'Not Available'}
-                                  </p>
+                                    </h3>
 
-                                  {!requiresRiceChoice && !requiresVariationChoice && (
-                                    <div 
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="border border-gray-400 sm:border-2 rounded px-2 sm:px-3 py-1 sm:py-2 mb-2 sm:mb-3"
-                                    >
-                                      <p className="text-center text-sm sm:text-sm font-semibold text-gray-700">{quantity}</p>
-                                      <div className="flex items-center justify-between gap-2 mt-1">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (isStoreClosedForCustomer) return;
-                                            setItemQuantities(prev => ({
-                                              ...prev,
-                                              [item._id]: Math.max(0, quantity - 1)
-                                            }));
-                                          }}
-                                          className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
-                                        >
-                                          −
-                                        </button>
-                                        <span className="text-sm sm:text-xs font-semibold text-gray-600">Qty</span>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (isStoreClosedForCustomer) return;
-                                            setItemQuantities(prev => ({
-                                              ...prev,
-                                              [item._id]: Math.min(availableQty, quantity + 1)
-                                            }));
-                                          }}
-                                          className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
-                                        >
-                                          +
-                                        </button>
+                                    <p className={`text-xs sm:text-xs font-semibold mt-0.5 mb-2 sm:mb-3 text-center ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                                      {isAvailable ? `Available: ${availableQty}` : 'Not Available'}
+                                    </p>
+
+                                    <p className="text-lg sm:text-xl font-bold text-gray-900 text-center mb-2 sm:mb-3">₱{item.price}</p>
+
+                                    {variationNames ? (
+                                      <p className="text-xs sm:text-sm text-gray-600 text-center mb-2 sm:mb-3 line-clamp-2">
+                                        {variationNames}
+                                      </p>
+                                    ) : null}
+
+                                    {!requiresRiceChoice && !requiresVariationChoice && (
+                                      <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="border border-gray-400 sm:border-2 rounded px-2 sm:px-3 py-1 sm:py-2 mb-2 sm:mb-3"
+                                      >
+                                        <p className="text-center text-sm sm:text-sm font-semibold text-gray-700">{quantity}</p>
+                                        <div className="flex items-center justify-between gap-2 mt-1">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (isStoreClosedForCustomer) return;
+                                              setItemQuantities(prev => ({
+                                                ...prev,
+                                                [item._id]: Math.max(0, quantity - 1)
+                                              }));
+                                            }}
+                                            className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                          >
+                                            −
+                                          </button>
+                                          <span className="text-sm sm:text-xs font-semibold text-gray-600">Qty</span>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (isStoreClosedForCustomer) return;
+                                              setItemQuantities(prev => ({
+                                                ...prev,
+                                                [item._id]: Math.min(availableQty, quantity + 1)
+                                              }));
+                                            }}
+                                            className="text-sm sm:text-lg font-bold text-gray-600 hover:text-gray-900 w-6 h-6 flex items-center justify-center"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {requiresRiceChoice && (
-                                    <p className="text-sm sm:text-xs text-gray-700 mb-2 sm:mb-3 min-h-[1rem] sm:min-h-[1.25rem]">Select rice option before adding.</p>
-                                  )}
+                                    {requiresRiceChoice && (
+                                      <p className="text-sm sm:text-sm text-gray-700 mb-2 sm:mb-3 text-center">Select rice option before adding.</p>
+                                    )}
 
-                                  <button 
-                                    disabled={isStoreClosedForCustomer || !isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (isStoreClosedForCustomer) {
-                                        alert('This store is currently closed and cannot accept orders.');
-                                        return;
-                                      }
-                                      if (requiresVariationChoice || requiresRiceChoice) {
-                                        setSelectedProduct(item);
-                                        return;
-                                      }
-                                      for (let i = 0; i < quantity; i++) {
-                                        const itemToAdd = {
-                                          ...item,
-                                          stallId: stallId
-                                        };
-                                        addToCart(itemToAdd);
-                                      }
-                                      setItemQuantities(prev => ({
-                                        ...prev,
-                                        [item._id]: 0
-                                      }));
-                                    }}
-                                    className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-sm sm:text-sm ${
-                                      isStoreClosedForCustomer || !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                                        : 'bg-[#8B0000] text-white hover:bg-red-800'
-                                    }`}
-                                  >
-                                    {requiresVariationChoice ? 'Choose Variation' : requiresRiceChoice ? 'Choose Rice Option' : 'Add to Basket'}
-                                  </button>
+                                    <button
+                                      disabled={isStoreClosedForCustomer || !isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isStoreClosedForCustomer) {
+                                          alert('This store is currently closed and cannot accept orders.');
+                                          return;
+                                        }
+                                        if (requiresVariationChoice || requiresRiceChoice) {
+                                          setSelectedProduct(item);
+                                          return;
+                                        }
+                                        for (let i = 0; i < quantity; i++) {
+                                          const itemToAdd = {
+                                            ...item,
+                                            stallId: stallId
+                                          };
+                                          addToCart(itemToAdd);
+                                        }
+                                        setItemQuantities(prev => ({
+                                          ...prev,
+                                          [item._id]: 0
+                                        }));
+                                      }}
+                                      className={`mt-auto w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-sm sm:text-lg ${
+                                        isStoreClosedForCustomer || !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
+                                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                          : 'bg-[#8B0000] text-white hover:bg-red-800'
+                                      }`}
+                                    >
+                                      {requiresVariationChoice ? 'Choose Variation' : requiresRiceChoice ? 'Choose Rice Option' : 'Add to Basket'}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             );

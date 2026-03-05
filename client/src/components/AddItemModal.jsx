@@ -21,6 +21,24 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
   const riceOptionsEnabled = formData.noRiceAvailable || formData.withRiceAvailable;
   const variationEnabled = formData.variationOptions.length > 0;
 
+  const numberFieldNames = new Set(['price', 'quantity', 'withRiceAdditionalPrice']);
+
+  const parseNumberFieldValue = (rawValue, allowDecimal = true) => {
+    if (rawValue === '') return '';
+    const normalized = String(rawValue).replace(/,/g, '');
+    const parsed = allowDecimal ? Number.parseFloat(normalized) : Number.parseInt(normalized, 10);
+    return Number.isNaN(parsed) ? '' : parsed;
+  };
+
+  const blockInvalidNumberKeys = (e, allowDecimal = true) => {
+    const blockedKeys = allowDecimal
+      ? ['e', 'E', '+', '-']
+      : ['e', 'E', '+', '-', '.', ','];
+    if (blockedKeys.includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -28,8 +46,8 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
       [name]:
         type === 'checkbox'
           ? checked
-          : name === 'price' || name === 'quantity' || name === 'withRiceAdditionalPrice'
-          ? parseFloat(value) || 0
+          : numberFieldNames.has(name)
+          ? parseNumberFieldValue(value, name !== 'quantity')
           : value
     }));
   };
@@ -86,7 +104,12 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
         if (index !== indexToUpdate) return option;
         return {
           ...option,
-          [field]: field === 'price' || field === 'quantity' ? parseFloat(value) || 0 : value
+          [field]:
+            field === 'price'
+              ? parseNumberFieldValue(value, true)
+              : field === 'quantity'
+              ? parseNumberFieldValue(value, false)
+              : value
         };
       })
     }));
@@ -274,6 +297,8 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                   name="price"
                   value={formData.price}
                   onChange={handleInputChange}
+                  onKeyDown={(e) => blockInvalidNumberKeys(e, true)}
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   disabled={variationEnabled}
@@ -292,6 +317,9 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleInputChange}
+                onKeyDown={(e) => blockInvalidNumberKeys(e, false)}
+                inputMode="numeric"
+                step="1"
                 min="0"
                 disabled={variationEnabled}
                 className="w-full border-2 border-gray-400 rounded px-4 py-2 font-semibold focus:outline-none focus:border-[#8B0000] disabled:bg-gray-100 disabled:text-gray-500"
@@ -355,6 +383,8 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                       step="0.01"
                       value={option.price}
                       onChange={(e) => handleVariationOptionChange(index, 'price', e.target.value)}
+                      onKeyDown={(e) => blockInvalidNumberKeys(e, true)}
+                      inputMode="decimal"
                       className="col-span-3 border-2 border-gray-300 rounded px-3 py-2 text-sm font-semibold focus:outline-none focus:border-[#8B0000]"
                       placeholder="Price"
                     />
@@ -363,6 +393,9 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                       min="0"
                       value={option.quantity}
                       onChange={(e) => handleVariationOptionChange(index, 'quantity', e.target.value)}
+                      onKeyDown={(e) => blockInvalidNumberKeys(e, false)}
+                      inputMode="numeric"
+                      step="1"
                       className="col-span-2 border-2 border-gray-300 rounded px-3 py-2 text-sm font-semibold focus:outline-none focus:border-[#8B0000]"
                       placeholder="Qty"
                     />
@@ -430,6 +463,8 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                       step="0.01"
                       value={formData.withRiceAdditionalPrice}
                       onChange={handleInputChange}
+                      onKeyDown={(e) => blockInvalidNumberKeys(e, true)}
+                      inputMode="decimal"
                       className="w-full border-2 border-gray-300 rounded px-3 py-2 font-semibold focus:outline-none focus:border-[#8B0000]"
                     />
                   </div>

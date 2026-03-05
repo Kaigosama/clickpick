@@ -2,16 +2,15 @@ import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import CustomerHeader from '../components/CustomerHeader.jsx';
 import api from '../services/api.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const { cartItems, cartTotal, clearCart } = useCart();
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stalls, setStalls] = useState([]);
   const [orderSuccess, setOrderSuccess] = useState(null);
@@ -150,28 +149,13 @@ const Checkout = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   if (!user) return null;
 
   // Success Modal
   if (orderSuccess) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        {/* Header Navigation */}
-        <header className="bg-[#8B0000] text-white shadow-lg fixed top-0 left-0 right-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            {/* Logo & Brand */}
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
-              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-              <span className="text-xl font-bold">ClickPick</span>
-            </div>
-            <p className="text-lg">Order Confirmation</p>
-          </div>
-        </header>
+        <CustomerHeader />
 
         {/* Success Modal */}
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center mt-20">
@@ -229,148 +213,7 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {showMobileNavMenu && (
-        <button
-          type="button"
-          aria-label="Close navigation menu"
-          onClick={() => setShowMobileNavMenu(false)}
-          className="sm:hidden fixed inset-0 z-[45] bg-transparent"
-        />
-      )}
-
-      {/* Header Navigation */}
-      <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
-          {/* Logo & Brand */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
-            <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-            <span className="text-xl font-bold">ClickPick</span>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="hidden sm:flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
-            <button 
-              onClick={() => navigate('/menu')}
-              className="hover:opacity-80 font-semibold text-lg"
-            >
-              STORES
-            </button>
-            <button 
-              onClick={() => navigate('/my-orders')}
-              className="hover:opacity-80 font-semibold text-lg"
-            >
-              MY ORDERS
-            </button>
-          </nav>
-
-          {/* User Profile */}
-          <div className="flex items-center gap-3 sm:gap-6">
-            <div className="sm:hidden relative">
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
-                  {user?.name || 'User'}
-                </p>
-                <button
-                  onClick={() => {
-                    setShowMobileNavMenu(!showMobileNavMenu);
-                    setShowProfileMenu(false);
-                  }}
-                  className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
-                  aria-label="Open navigation menu"
-                >
-                  ☰
-                </button>
-              </div>
-
-              {showMobileNavMenu && (
-                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/menu');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Stores
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/my-orders');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    My Orders
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/order-history');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Order History
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMobileNavMenu(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="relative hidden sm:block">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
-              >
-                <div className="flex items-center gap-1">
-                  <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
-                  <p className="text-xs">▼</p>
-                </div>
-              </button>
-
-              {/* Dropdown Menu */}
-              {showProfileMenu && (
-                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48">
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <CustomerHeader />
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">

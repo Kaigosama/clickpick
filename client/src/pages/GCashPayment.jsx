@@ -2,19 +2,18 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import CustomerHeader from '../components/CustomerHeader.jsx';
 import api from '../services/api.js';
 
 const GCashPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const { cartItems, cartTotal, clearCart } = useCart();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
   const [uploaded, setUploaded] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
   const [gcashNumber, setGcashNumber] = useState('Not available');
 
   const resolveStoreId = (item) => {
@@ -133,150 +132,11 @@ const GCashPayment = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {showMobileNavMenu && (
-        <button
-          type="button"
-          aria-label="Close navigation menu"
-          onClick={() => setShowMobileNavMenu(false)}
-          className="sm:hidden fixed inset-0 z-[45] bg-transparent"
-        />
-      )}
-
-      <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
-            <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-            <span className="text-xl font-bold">ClickPick</span>
-          </div>
-
-          <nav className="hidden sm:flex items-center gap-3 sm:gap-8 text-sm sm:text-base">
-            <button
-              onClick={() => navigate('/menu')}
-              className="hover:opacity-80 font-semibold text-lg"
-            >
-              STORES
-            </button>
-            <button
-              onClick={() => navigate('/my-orders')}
-              className="hover:opacity-80 font-semibold text-lg"
-            >
-              MY ORDERS
-            </button>
-          </nav>
-
-          <div className="flex items-center gap-3 sm:gap-6">
-            <div className="sm:hidden relative">
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm uppercase max-w-[120px] truncate">{user?.name || 'User'}</p>
-                <button
-                  onClick={() => {
-                    setShowMobileNavMenu(!showMobileNavMenu);
-                    setShowProfileMenu(false);
-                  }}
-                  className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
-                  aria-label="Open navigation menu"
-                >
-                  ☰
-                </button>
-              </div>
-
-              {showMobileNavMenu && (
-                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/menu');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Stores
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/my-orders');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    My Orders
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/order-history');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Order History
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMobileNavMenu(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="relative hidden sm:block">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
-              >
-                <div className="flex items-center gap-1">
-                  <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
-                  <p className="text-xs">▼</p>
-                </div>
-              </button>
-
-              {showProfileMenu && (
-                <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48">
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <CustomerHeader />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
