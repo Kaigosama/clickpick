@@ -173,7 +173,6 @@ const PaymentWaiting = () => {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
               >
-                <div className="w-8 h-8 bg-white rounded-full" />
                 <div className="flex items-center gap-1">
                   <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
                   <p className="text-xs">▼</p>
