@@ -41,7 +41,8 @@ const OrderSchema = new mongoose.Schema({
   orderNumber: { type: Number },
   queueNumber: { type: Number },
   estimatedTime: { type: Number }, // Estimated preparation time in minutes
-  stallId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  stallId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  inventoryDeducted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', OrderSchema);

@@ -9,6 +9,7 @@ const Transaction = require('../models/Transaction');
 const SalesReport = require('../models/SalesReport');
 const { sendStatusSMS } = require('../utils/smsService');
 const { GRACE_PERIOD_MINUTES, processExpiredReadyOrders } = require('../utils/orderGraceService');
+const { deductInventoryForOrder, restoreInventoryForOrder } = require('../utils/inventoryService');
 
 const uploadRefundProof = multer({
   storage: multer.memoryStorage(),
@@ -83,96 +84,6 @@ const getRequesterFromToken = async (req) => {
     return user || null;
   } catch (err) {
     return null;
-  }
-};
-
-const deductInventoryForOrder = async (order) => {
-  const orderItems = order?.items || [];
-
-  if (!orderItems.length) {
-    return;
-  }
-
-  const requiredByItemId = new Map();
-  const requiredByItemVariation = new Map();
-
-  for (const item of orderItems) {
-    if (!item.menuItemId || !item.quantity) {
-      continue;
-    }
-
-    const itemId = String(item.menuItemId);
-    const existingQty = requiredByItemId.get(itemId) || 0;
-    requiredByItemId.set(itemId, existingQty + item.quantity);
-
-    const selectedVariation = String(item.variation || '').trim();
-    if (selectedVariation) {
-      const variationKey = `${itemId}::${selectedVariation}`;
-      const existingVariationQty = requiredByItemVariation.get(variationKey) || 0;
-      requiredByItemVariation.set(variationKey, existingVariationQty + item.quantity);
-    }
-  }
-
-  const itemIds = Array.from(requiredByItemId.keys());
-  if (!itemIds.length) {
-    return;
-  }
-
-  const menuItems = await MenuItem.find({ _id: { $in: itemIds } });
-  const menuItemsById = new Map(menuItems.map((menuItem) => [String(menuItem._id), menuItem]));
-
-  for (const itemId of itemIds) {
-    const menuItem = menuItemsById.get(itemId);
-    const requiredQty = requiredByItemId.get(itemId) || 0;
-
-    if (!menuItem) {
-      throw new Error('One or more food items no longer exist');
-    }
-
-    if (menuItem.quantity < requiredQty) {
-      throw new Error(`Insufficient stock for ${menuItem.name}`);
-    }
-
-    const menuVariationOptions = Array.isArray(menuItem.variationOptions) ? menuItem.variationOptions : [];
-    if (menuVariationOptions.length > 0) {
-      for (const [variationKey, variationQty] of requiredByItemVariation.entries()) {
-        const [variationItemId, variationName] = variationKey.split('::');
-        if (variationItemId !== itemId) continue;
-
-        const matchedOption = menuVariationOptions.find((option) => String(option.name).trim() === variationName);
-        if (!matchedOption) {
-          throw new Error(`Variation ${variationName} is unavailable for ${menuItem.name}`);
-        }
-
-        if (Number(matchedOption.quantity || 0) < variationQty) {
-          throw new Error(`Insufficient stock for ${menuItem.name} (${variationName})`);
-        }
-      }
-    }
-  }
-
-  for (const itemId of itemIds) {
-    const requiredQty = requiredByItemId.get(itemId) || 0;
-    const menuItem = menuItemsById.get(itemId);
-    const nextQuantity = menuItem.quantity - requiredQty;
-    const menuVariationOptions = Array.isArray(menuItem.variationOptions) ? menuItem.variationOptions : [];
-
-    if (menuVariationOptions.length > 0) {
-      menuItem.variationOptions = menuVariationOptions.map((option) => {
-        const variationKey = `${itemId}::${String(option.name).trim()}`;
-        const requiredVariationQty = requiredByItemVariation.get(variationKey) || 0;
-        if (!requiredVariationQty) return option;
-
-        return {
-          ...option.toObject?.() || option,
-          quantity: Math.max(0, Number(option.quantity || 0) - requiredVariationQty)
-        };
-      });
-    }
-
-    menuItem.quantity = Math.max(0, nextQuantity);
-    menuItem.isAvailable = nextQuantity > 0;
-    await menuItem.save();
   }
 };
 
@@ -373,13 +284,20 @@ router.put('/:id', async (req, res) => {
 
     if (req.body.status) {
       const nextStatus = String(req.body.status).toLowerCase();
+      const isGcashOrder = String(existingOrder.paymentMethod || '').toLowerCase() === 'gcash';
+      const inventoryAlreadyDeducted = existingOrder.inventoryDeducted === true || (existingOrder.inventoryDeducted === undefined && isGcashOrder);
 
       if (nextStatus === 'cancelled' && String(existingOrder.status).toLowerCase() === 'preparing') {
         return res.status(400).json({ message: 'Cannot cancel an order that is already preparing' });
       }
 
-      if (nextStatus === 'completed' && existingOrder.status !== 'completed') {
+      if (
+        nextStatus === 'completed' &&
+        existingOrder.status !== 'completed' &&
+        !inventoryAlreadyDeducted
+      ) {
         await deductInventoryForOrder(existingOrder);
+        updateData.inventoryDeducted = true;
       }
 
       if (nextStatus === 'ready') {
@@ -395,6 +313,11 @@ router.put('/:id', async (req, res) => {
         updateData.refundRequired = false;
         updateData.refundStatus = 'not_required';
       } else if (nextStatus === 'cancelled') {
+        if (inventoryAlreadyDeducted) {
+          await restoreInventoryForOrder(existingOrder);
+          updateData.inventoryDeducted = false;
+        }
+
         updateData.autoCancelledAt = existingOrder.autoCancelledAt || new Date();
         updateData.cancellationReason = req.body.cancellationReason || 'manual_cancel';
 
@@ -479,6 +402,12 @@ router.post('/:id/refund-proof', uploadRefundProof.single('refundProof'), async 
     order.refundProofSentAt = new Date();
     order.refundStatus = 'proof_sent';
     order.paymentStatus = 'refunded';
+
+    const inventoryAlreadyDeducted = order.inventoryDeducted === true || order.inventoryDeducted === undefined;
+    if (inventoryAlreadyDeducted) {
+      await restoreInventoryForOrder(order);
+      order.inventoryDeducted = false;
+    }
 
     await order.save();
 

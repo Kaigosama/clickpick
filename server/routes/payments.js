@@ -9,6 +9,7 @@ const MenuItem = require('../models/MenuItem');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { sendStatusSMS } = require('../utils/smsService');
+const { deductInventoryForOrder, restoreInventoryForOrder } = require('../utils/inventoryService');
 
 const getRequesterFromToken = async (req) => {
   const authHeader = req.headers.authorization || '';
@@ -171,23 +172,9 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       }
     }
 
-    // Deduct quantities from menu items
-    for (const item of parsedItems) {
-      await MenuItem.findByIdAndUpdate(
-        item.menuItemId,
-        {
-          $inc: { quantity: -item.quantity },
-          $set: { isAvailable: true } // Will be set to false below if quantity becomes 0
-        }
-      );
-      
-      // Check if quantity is now 0 and update isAvailable
-      const updatedItem = await MenuItem.findById(item.menuItemId);
-      if (updatedItem.quantity <= 0) {
-        updatedItem.isAvailable = false;
-        await updatedItem.save();
-      }
-    }
+    await deductInventoryForOrder(savedOrder);
+    savedOrder.inventoryDeducted = true;
+    await savedOrder.save();
 
     // Create payment record
     const payment = new Payment({
@@ -376,13 +363,10 @@ router.post('/gcash-reject/:paymentId', async (req, res) => {
       const order = await Order.findById(payment.orderDbId);
 
       if (order && String(order.status || '').toLowerCase() !== 'cancelled') {
-        for (const item of order.items || []) {
-          if (!item?.menuItemId || !Number(item?.quantity || 0)) continue;
-
-          await MenuItem.findByIdAndUpdate(item.menuItemId, {
-            $inc: { quantity: Number(item.quantity || 0) },
-            $set: { isAvailable: true }
-          });
+        const inventoryAlreadyDeducted = order.inventoryDeducted === true || order.inventoryDeducted === undefined;
+        if (inventoryAlreadyDeducted) {
+          await restoreInventoryForOrder(order);
+          order.inventoryDeducted = false;
         }
 
         order.status = 'cancelled';
