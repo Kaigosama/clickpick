@@ -216,4 +216,36 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
   }
 });
 
+// CHANGE PASSWORD (verifies current password first)
+router.post('/change-password', async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    if (String(newPassword).trim().length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Wrong current password.' });
+    }
+
+    user.password = await bcrypt.hash(String(newPassword).trim(), SALT_ROUNDS);
+    await user.save();
+
+    res.status(200).json({ message: 'Password changed successfully.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error changing password.' });
+  }
+});
+
 module.exports = router;

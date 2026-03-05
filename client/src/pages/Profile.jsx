@@ -19,6 +19,11 @@ const Profile = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [pwData, setPwData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
 
   useEffect(() => {
@@ -52,11 +57,12 @@ const Profile = () => {
     setLoading(true);
     setMessage('');
 
-    if (formData.password && formData.password !== formData.confirmPassword) {
+    if (isStaff && formData.password && formData.password !== formData.confirmPassword) {
       setMessage('Error updating profile: Passwords do not match.');
       setLoading(false);
       return;
     }
+
 
     try {
       let response = null;
@@ -76,7 +82,7 @@ const Profile = () => {
           userId: user._id,
           name: formData.name
         };
-        if (formData.password) {
+        if (isStaff && formData.password) {
           payload.password = formData.password;
         }
         if (!isStaff) {
@@ -108,6 +114,38 @@ const Profile = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess('');
+    if (pwData.newPassword !== pwData.confirmPassword) {
+      setPwError('New passwords do not match.');
+      return;
+    }
+    if (pwData.newPassword.length < 6) {
+      setPwError('New password must be at least 6 characters.');
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await api.post('/auth/change-password', {
+        userId: user._id,
+        currentPassword: pwData.currentPassword,
+        newPassword: pwData.newPassword
+      });
+      setPwSuccess('Password changed successfully!');
+      setPwData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setPwSuccess('');
+      }, 1500);
+    } catch (err) {
+      setPwError(err.response?.data?.message || 'Error changing password.');
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   if (!user) return null;
@@ -266,34 +304,48 @@ const Profile = () => {
               </>
             )}
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                New Password (Optional)
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
-                placeholder="Leave blank to keep current password"
-              />
-            </div>
+            {!isStaff && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => { setShowChangePassword(true); setPwError(''); setPwSuccess(''); }}
+                  className="w-full border-2 border-[#8B0000] text-[#8B0000] font-bold py-2 rounded-lg hover:bg-[#8B0000] hover:text-white transition-colors"
+                >
+                  Change Password
+                </button>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
-                placeholder="Re-enter new password"
-              />
-            </div>
+            {isStaff && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    New Password (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                    placeholder="Leave blank to keep current password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                    placeholder="Re-enter new password"
+                  />
+                </div>
+              </>
+            )}
 
             {isStaff && (
               <div>
@@ -361,6 +413,79 @@ const Profile = () => {
           </div>
         </div>
       </main>
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 sm:p-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Change Password</h2>
+            <p className="text-sm text-gray-500 mb-6">Enter your current password then set a new one.</p>
+
+            {pwError && (
+              <div className="bg-red-100 text-red-800 rounded-lg px-4 py-3 mb-4 text-sm font-medium">
+                {pwError}
+              </div>
+            )}
+            {pwSuccess && (
+              <div className="bg-green-100 text-green-800 rounded-lg px-4 py-3 mb-4 text-sm font-medium">
+                {pwSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={pwData.currentPassword}
+                  onChange={(e) => setPwData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                  placeholder="Enter current password"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={pwData.newPassword}
+                  onChange={(e) => setPwData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                  placeholder="At least 6 characters"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={pwData.confirmPassword}
+                  onChange={(e) => setPwData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                  placeholder="Re-enter new password"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={pwLoading}
+                  className="flex-1 bg-[#8B0000] text-white font-bold py-2.5 rounded-lg hover:bg-red-800 transition-colors disabled:opacity-50"
+                >
+                  {pwLoading ? 'Saving...' : 'Save Password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowChangePassword(false); setPwData({ currentPassword: '', newPassword: '', confirmPassword: '' }); setPwError(''); }}
+                  className="flex-1 bg-gray-200 text-gray-900 font-bold py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
