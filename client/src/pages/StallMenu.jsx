@@ -562,6 +562,26 @@ const StallMenu = () => {
     return cancelledOrders;
   };
 
+  const getRefundRequiredOrders = () => {
+    return cancelledOrders
+      .filter((order) => {
+        const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+        const refundStatus = String(order?.refundStatus || '').toLowerCase();
+        return paymentMethod === 'gcash' && !['proof_sent', 'confirmed'].includes(refundStatus);
+      })
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+  };
+
+  const getAwaitingRefundConfirmationOrders = () => {
+    return cancelledOrders
+      .filter((order) => {
+        const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+        const refundStatus = String(order?.refundStatus || '').toLowerCase();
+        return paymentMethod === 'gcash' && refundStatus === 'proof_sent';
+      })
+      .sort((a, b) => new Date(b.refundProofSentAt || b.updatedAt || b.createdAt) - new Date(a.refundProofSentAt || a.updatedAt || a.createdAt));
+  };
+
   const getQueueStats = () => {
     const pending = getPendingOrders().length;
     const preparing = getPreparingOrders().length;
@@ -1227,6 +1247,84 @@ const StallMenu = () => {
                             </div>
                           )}
                           <button onClick={() => updateOrderStatus(order._id, 'completed')} className="w-full bg-gray-400 text-white py-2 rounded font-semibold hover:bg-gray-500 transition-all">Mark as Picked Up</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Refund Orders */}
+                {getRefundRequiredOrders().length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold text-red-300 mb-4">💸 Refund Needed (Cancelled GCash)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {getRefundRequiredOrders().map((order) => {
+                        const isUploading = uploadingRefundForOrder === order._id;
+                        const selectedFile = refundProofFiles[order._id];
+
+                        return (
+                          <div key={order._id} className="bg-red-500 bg-opacity-20 border-2 border-red-300 rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <span className="text-lg font-bold">Queue #{order.queueNumber}</span>
+                                <p className="text-xs opacity-75 mt-1">Order #{order.orderNumber || order._id}</p>
+                                <p className="text-xs opacity-75 mt-1">ID: {order._id}</p>
+                              </div>
+                              <span className="bg-red-200 text-red-800 px-2 py-1 rounded text-xs font-bold">REFUND NEEDED</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                              <div>
+                                <p className="text-xs opacity-80"><strong>Customer:</strong></p>
+                                <p>{order.customerId?.name || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs opacity-80"><strong>Amount:</strong></p>
+                                <p>₱{Number(order.totalAmount || 0).toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            <label className="block text-xs font-semibold mb-1">Refund proof image *</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleRefundProofChange(order._id, e.target.files?.[0])}
+                              className="w-full text-xs mb-3"
+                            />
+
+                            <button
+                              onClick={() => submitRefundProof(order._id)}
+                              disabled={!selectedFile || isUploading}
+                              className={`w-full py-2 rounded font-semibold text-sm ${!selectedFile || isUploading ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                            >
+                              {isUploading ? 'Uploading...' : 'Submit Refund Proof'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Awaiting Customer Confirmation */}
+                {getAwaitingRefundConfirmationOrders().length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold text-blue-200 mb-4">⏳ Awaiting Customer Confirmation</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {getAwaitingRefundConfirmationOrders().map((order) => (
+                        <div key={`awaiting-${order._id}`} className="bg-blue-500 bg-opacity-20 border-2 border-blue-300 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <span className="text-lg font-bold">Queue #{order.queueNumber}</span>
+                              <p className="text-xs opacity-75 mt-1">Order #{order.orderNumber || order._id}</p>
+                            </div>
+                            <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold">PROOF SENT</span>
+                          </div>
+                          <p className="text-sm"><strong>Customer:</strong> {order.customerId?.name || 'N/A'}</p>
+                          <p className="text-sm"><strong>Amount:</strong> ₱{Number(order.totalAmount || 0).toFixed(2)}</p>
+                          <p className="text-xs opacity-80 mt-2">
+                            <strong>Proof sent:</strong> {order.refundProofSentAt ? new Date(order.refundProofSentAt).toLocaleString() : 'N/A'}
+                          </p>
                         </div>
                       ))}
                     </div>

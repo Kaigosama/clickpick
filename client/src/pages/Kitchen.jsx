@@ -206,8 +206,24 @@ const Kitchen = () => {
 
   const getRefundRequiredOrders = () => {
     return orders
-      .filter(o => o.status?.toLowerCase() === 'cancelled' && o.paymentMethod === 'gcash' && o.refundRequired && o.refundStatus === 'pending')
+      .filter(o => {
+        const status = String(o.status || '').toLowerCase();
+        const paymentMethod = String(o.paymentMethod || '').toLowerCase();
+        const refundStatus = String(o.refundStatus || '').toLowerCase();
+
+        if (status !== 'cancelled' || paymentMethod !== 'gcash') return false;
+        if (['proof_sent', 'confirmed'].includes(refundStatus)) return false;
+
+        // Show all cancelled GCash orders not yet completed in the refund workflow.
+        return true;
+      })
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  };
+
+  const getAwaitingConfirmationOrders = () => {
+    return orders
+      .filter(o => String(o.refundStatus || '').toLowerCase() === 'proof_sent')
+      .sort((a, b) => new Date(b.refundProofSentAt) - new Date(a.refundProofSentAt));
   };
 
   return (
@@ -659,68 +675,132 @@ const Kitchen = () => {
               </div>
             )}
 
-            {getRefundRequiredOrders().length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '1.3em', color: '#ff5252', margin: '15px 0 10px 0' }}>💸 Manual GCash Refund Required</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-                  {getRefundRequiredOrders().map(order => (
-                    <div key={order._id} style={{ padding: '15px', background: 'rgba(244, 67, 54, 0.2)', border: '2px solid #ff5252', borderRadius: '8px', color: 'white' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '1.2em', fontWeight: 'bold' }}>Order #{order.queueNumber}</span>
-                        <span style={{ background: '#ff5252', color: 'white', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.8em' }}>
-                          REFUND NEEDED
-                        </span>
-                      </div>
-
-                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>Amount:</strong> ₱{order.totalAmount}</p>
-                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>Customer:</strong> {order.customerId?.name || 'N/A'}</p>
-                      <p style={{ margin: '6px 0', fontSize: '0.92em' }}><strong>GCash Number:</strong> {order.customerId?.phone || 'Not provided'}</p>
-                      <p style={{ margin: '10px 0', fontSize: '0.85em', color: '#ffe0e0' }}>
-                        Auto-cancelled after 15 minutes unclaimed. Process refund in GCash, then upload proof below.
-                      </p>
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setRefundProofFiles(prev => ({ ...prev, [order._id]: e.target.files?.[0] || null }))}
-                        style={{ width: '100%', marginBottom: '8px' }}
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Optional note"
-                        value={refundNotes[order._id] || ''}
-                        onChange={(e) => setRefundNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
-                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', marginBottom: '10px' }}
-                      />
-
-                      <button
-                        onClick={() => submitRefundProof(order._id)}
-                        disabled={!refundProofFiles[order._id]}
-                        style={{
-                          width: '100%',
-                          background: refundProofFiles[order._id] ? '#4caf50' : '#999',
-                          color: 'white',
-                          border: 'none',
-                          padding: '10px',
-                          borderRadius: '6px',
-                          cursor: refundProofFiles[order._id] ? 'pointer' : 'not-allowed',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Send Refund Proof + SMS
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {getQueueStats().total === 0 && (
               <div style={{ textAlign: 'center', padding: '40px', fontSize: '1.2em', opacity: 0.7 }}>
                 ✨ No orders in queue - You're all caught up!
               </div>
             )}
+          </div>
+        )}
+
+      </div>
+      {/* SECTION: GCASH REFUNDS — AWAITING CUSTOMER CONFIRMATION */}
+      {getAwaitingConfirmationOrders().length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)', padding: '25px', borderRadius: '15px', border: '3px solid #42a5f5', color: 'white' }}>
+          <h2 style={{ fontSize: '1.8em', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            ⏳ Awaiting Customer Confirmation
+            <span style={{ background: 'rgba(255,255,255,0.3)', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7em' }}>
+              {getAwaitingConfirmationOrders().length}
+            </span>
+          </h2>
+          <p style={{ margin: '0 0 20px 0', fontSize: '0.9em', opacity: 0.85 }}>
+            Refund proof has been sent. Waiting for the customer to confirm receipt.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            {getAwaitingConfirmationOrders().map(order => (
+              <div key={order._id} style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '12px', color: '#333', border: '2px solid #42a5f5' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '1.2em', fontWeight: 'bold', color: '#1565c0' }}>Order #{order.queueNumber}</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8em', color: '#666' }}>{order.createdAt ? new Date(order.createdAt).toLocaleString() : ''}</p>
+                  </div>
+                  <span style={{ background: '#42a5f5', color: 'white', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.8em' }}>PROOF SENT</span>
+                </div>
+                <div style={{ padding: '10px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '0.9em' }}><strong>Amount:</strong> <span style={{ color: '#1565c0', fontWeight: 'bold' }}>&#8369;{order.totalAmount?.toFixed(2)}</span></p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}><strong>Customer:</strong> {order.customerId?.name || 'N/A'}</p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}><strong>GCash No.:</strong> {order.customerId?.phone || 'Not provided'}</p>
+                  {order.refundProofSentAt && (
+                    <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>Proof sent: {new Date(order.refundProofSentAt).toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* SECTION: GCASH REFUNDS */}
+      <div style={{ background: 'linear-gradient(135deg, #b71c1c 0%, #7f0000 100%)', padding: '25px', borderRadius: '15px', border: '3px solid #ff5252', color: 'white' }}>
+        <h2 style={{ fontSize: '1.8em', margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          💸 GCash Refunds Needed
+          <span style={{ background: 'rgba(255,255,255,0.3)', padding: '5px 15px', borderRadius: '20px', fontSize: '0.7em' }}>
+            {getRefundRequiredOrders().length}
+          </span>
+        </h2>
+        <p style={{ margin: '0 0 20px 0', fontSize: '0.9em', opacity: 0.85 }}>
+          These GCash orders were cancelled after payment was approved. Send the refund in GCash, then upload proof below to notify the customer.
+        </p>
+        {getRefundRequiredOrders().length === 0 ? (
+          <div style={{ background: 'rgba(255,255,255,0.15)', border: '1px dashed rgba(255,255,255,0.6)', borderRadius: '10px', padding: '16px' }}>
+            <p style={{ margin: 0, fontSize: '0.92em' }}>
+              No refunds currently need proof upload. When an eligible cancelled GCash order appears, its upload window will show here.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            {getRefundRequiredOrders().map(order => (
+              <div key={order._id} style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '12px', color: '#333', border: '2px solid #ff5252' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '1.2em', fontWeight: 'bold', color: '#b71c1c' }}>Order #{order.queueNumber}</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8em', color: '#666' }}>{order.createdAt ? new Date(order.createdAt).toLocaleString() : ''}</p>
+                  </div>
+                  <span style={{ background: '#ff5252', color: 'white', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.8em' }}>REFUND NEEDED</span>
+                </div>
+
+                <div style={{ marginBottom: '14px', padding: '10px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '0.9em' }}><strong>Amount to Refund:</strong> <span style={{ color: '#b71c1c', fontWeight: 'bold', fontSize: '1.05em' }}>&#8369;{order.totalAmount?.toFixed(2)}</span></p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}><strong>Customer:</strong> {order.customerId?.name || 'N/A'}</p>
+                  <p style={{ margin: 0, fontSize: '0.9em' }}><strong>GCash No.:</strong> {order.customerId?.phone || 'Not provided'}</p>
+                </div>
+
+                <p style={{ margin: '0 0 12px 0', fontSize: '0.83em', color: '#c62828', fontWeight: '500' }}>
+                  {order.cancellationReason === 'grace_period_expired'
+                    ? 'Order auto-cancelled after 15-min grace period.'
+                    : 'Order was cancelled after payment was approved.'}
+                  {' '}Send the refund via GCash then upload a screenshot below.
+                </p>
+
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.85em', marginBottom: '5px', color: '#444' }}>Upload Refund Screenshot *</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setRefundProofFiles(prev => ({ ...prev, [order._id]: e.target.files?.[0] || null }))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.85em', marginBottom: '5px', color: '#444' }}>Note (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Refund sent via GCash ref #..."
+                    value={refundNotes[order._id] || ''}
+                    onChange={(e) => setRefundNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
+                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <button
+                  onClick={() => submitRefundProof(order._id)}
+                  disabled={!refundProofFiles[order._id]}
+                  style={{
+                    width: '100%',
+                    background: refundProofFiles[order._id] ? '#4caf50' : '#bbb',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    cursor: refundProofFiles[order._id] ? 'pointer' : 'not-allowed',
+                    fontWeight: 'bold',
+                    fontSize: '1em'
+                  }}
+                >
+                  ✅ Submit Refund Proof + Notify Customer
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

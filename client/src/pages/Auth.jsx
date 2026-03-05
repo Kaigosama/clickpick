@@ -112,9 +112,7 @@ const Auth = () => {
 
         // 4. Redirect based on Role
         if (res.data.user.role === 'stall_staff') {
-          // If the user has a `stallId` property use it, otherwise default to stall 1
-            const stallId = res.data.user.stallId || res.data.user._id || '1';
-          navigate(`/stall/${stallId}`);
+          navigate('/kitchen');
         } else {
           navigate('/menu');
         }

@@ -69,8 +69,7 @@ const PrivateRoute = ({ children, role }) => {
       if (!role.includes(user.role)) {
         // Redirect to appropriate dashboard based on user's actual role
         if (user.role === 'stall_staff') {
-          const stallId = user.stallId || user._id || '1';
-          return <Navigate to={`/stall/${stallId}`} replace />;
+          return <Navigate to="/kitchen" replace />;
         } else if (user.role === 'customer') {
           return <Navigate to="/menu" replace />;
         }
@@ -80,8 +79,7 @@ const PrivateRoute = ({ children, role }) => {
       if (user.role !== role) {
         // Redirect to appropriate dashboard based on user's actual role
         if (user.role === 'stall_staff') {
-          const stallId = user.stallId || user._id || '1';
-          return <Navigate to={`/stall/${stallId}`} replace />;
+          return <Navigate to="/kitchen" replace />;
         } else if (user.role === 'customer') {
           return <Navigate to="/menu" replace />;
         }
