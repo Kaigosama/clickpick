@@ -81,6 +81,9 @@ const Menu = () => {
             <button onClick={() => navigate('/my-orders')} className="hover:opacity-80 font-semibold text-lg">
               MY ORDERS
             </button>
+            <button onClick={() => navigate('/order-history')} className="hover:opacity-80 font-semibold text-lg">
+              ORDER HISTORY
+            </button>
           </nav>
 
           {/* User Profile & Cart */}
@@ -117,9 +120,18 @@ const Menu = () => {
                       navigate('/my-orders');
                       setShowMobileNavMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
                     📋 My Orders
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/order-history');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                  >
+                    🕘 Order History
                   </button>
                   <button
                     onClick={() => {
