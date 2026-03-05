@@ -7,6 +7,7 @@ import ProductDetail from '../components/ProductDetail.jsx';
 import CartPreview from '../components/CartPreview.jsx';
 import EditItemModal from '../components/EditItemModal.jsx';
 import AddItemModal from '../components/AddItemModal.jsx';
+import CustomerHeader from '../components/CustomerHeader.jsx';
 import { getSocket } from '../services/socket.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
 import { jsPDF } from 'jspdf';
@@ -39,7 +40,6 @@ const StallMenu = () => {
   const [showQueueFlow, setShowQueueFlow] = useState(false);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
-  const [showCustomerMobileMenu, setShowCustomerMobileMenu] = useState(false);
   const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);
   const [cancelledOrders, setCancelledOrders] = useState([]);
@@ -695,12 +695,11 @@ const StallMenu = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {(showCustomerMobileMenu || showStaffMobileMenu) && (
+      {showStaffMobileMenu && isStaff && (
         <button
           type="button"
           aria-label="Close navigation menu"
           onClick={() => {
-            setShowCustomerMobileMenu(false);
             setShowStaffMobileMenu(false);
           }}
           className="sm:hidden fixed inset-0 z-[45] bg-transparent"
@@ -709,195 +708,62 @@ const StallMenu = () => {
 
       {/* Header Navigation - staff or customer */}
       {!isStaff ? (
-        <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
-              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-              <span className="text-xl font-bold">ClickPick</span>
+        <CustomerHeader activePage="stores" />
+      ) : (
+        <header className="bg-[#8B0000] text-white font-sans shadow-lg sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
+            <div className="min-w-0 flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('products')}>
+              <img src="/logo.png" alt="ClickPick" className="w-9 h-9 sm:w-12 sm:h-12 object-contain" />
+              <span className="text-sm sm:text-xl font-semibold sm:font-bold tracking-tight text-white/95 truncate">ClickPick Canteen Dashboard</span>
             </div>
 
-            <nav className="hidden sm:flex items-center gap-8">
-              <button 
-                onClick={() => navigate('/menu')}
-                className="hover:opacity-80 font-semibold text-lg"
+            <nav className="hidden sm:flex items-end gap-3 sm:gap-8 text-sm sm:text-base">
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`relative font-semibold text-lg pb-2 transition-colors ${activeTab === 'products' ? 'text-white' : 'text-white/85 hover:text-white'}`}
               >
-                STORES
-              </button>
-              <button 
-                onClick={() => navigate('/my-orders')}
-                className="hover:opacity-80 font-semibold text-lg"
-              >
-                MY ORDERS
+                PRODUCTS
+                {activeTab === 'products' && <span className="absolute left-0 right-0 -bottom-[2px] h-1 rounded-sm bg-[#f4c542]" />}
               </button>
               <button
-                onClick={() => navigate('/order-history')}
-                className="hover:opacity-80 font-semibold text-lg"
+                onClick={() => setActiveTab('orders')}
+                className={`relative font-semibold text-lg pb-2 transition-colors ${activeTab === 'orders' ? 'text-white' : 'text-white/85 hover:text-white'}`}
               >
-                ORDER HISTORY
+                ORDERS
+                {activeTab === 'orders' && <span className="absolute left-0 right-0 -bottom-[2px] h-1 rounded-sm bg-[#f4c542]" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('sales')}
+                className={`relative font-semibold text-lg pb-2 transition-colors ${activeTab === 'sales' ? 'text-white' : 'text-white/85 hover:text-white'}`}
+              >
+                SALES
+                {activeTab === 'sales' && <span className="absolute left-0 right-0 -bottom-[2px] h-1 rounded-sm bg-[#f4c542]" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`relative font-semibold text-lg pb-2 transition-colors ${activeTab === 'settings' ? 'text-white' : 'text-white/85 hover:text-white'}`}
+              >
+                SETTINGS
+                {activeTab === 'settings' && <span className="absolute left-0 right-0 -bottom-[2px] h-1 rounded-sm bg-[#f4c542]" />}
               </button>
             </nav>
 
             <div className="flex items-center gap-3 sm:gap-6">
+
               <div className="sm:hidden relative">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-sm uppercase max-w-[120px] truncate">
-                    {user?.name || 'User'}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowCustomerMobileMenu(!showCustomerMobileMenu);
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
-                    aria-label="Open navigation menu"
-                  >
-                    ☰
-                  </button>
-                </div>
-
-                {showCustomerMobileMenu && (
-                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setShowCustomerMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/menu');
-                        setShowCustomerMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Stores
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/my-orders');
-                        setShowCustomerMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      My Orders
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/order-history');
-                        setShowCustomerMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Order History
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowCustomerMobileMenu(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative hidden sm:block">
-                <button 
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                <button
+                  onClick={() => {
+                    setShowStaffMobileMenu(!showStaffMobileMenu);
+                    setShowProfileMenu(false);
+                  }}
+                  className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                  aria-label="Open staff profile menu"
                 >
-                  <div className="flex items-center gap-1">
-                    <p className="font-semibold text-sm uppercase">{user?.name || 'User'}</p>
-                    <p className="text-xs">▼</p>
-                  </div>
-                </button>
-
-                {showProfileMenu && (
-                  <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-48">
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setShowProfileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowProfileMenu(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
-      ) : (
-        <header className="bg-[#8B0000] text-white shadow sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
-              <div className="hidden sm:block">
-                <span className="text-lg font-semibold">ClickPick Canteen Dashboard</span>
-              </div>
-            </div>
-
-            <nav className="hidden md:flex items-center gap-8">
-              <button 
-                onClick={() => setActiveTab('products')}
-                className={`font-semibold transition-all ${activeTab === 'products' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
-              >
-                PRODUCTS
-              </button>
-              <button 
-                onClick={() => setActiveTab('orders')}
-                className={`font-semibold transition-all ${activeTab === 'orders' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
-              >
-                ORDERS
-              </button>
-              <button 
-                onClick={() => setActiveTab('sales')}
-                className={`font-semibold transition-all ${activeTab === 'sales' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
-              >
-                SALES
-              </button>
-              <button 
-                onClick={() => setActiveTab('settings')}
-                className={`font-semibold transition-all ${activeTab === 'settings' ? 'underline text-white' : 'opacity-70 hover:opacity-100'}`}
-              >
-                SETTINGS
-              </button>
-            </nav>
-
-            <div className="flex items-center gap-4">
-
-              <div className="sm:hidden relative">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-sm uppercase max-w-[130px] truncate">
+                  <p className="font-medium text-xs uppercase max-w-[130px] truncate text-white/95">
                     {user?.name || 'Staff'}
                   </p>
-                  <button
-                    onClick={() => {
-                      setShowStaffMobileMenu(!showStaffMobileMenu);
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-9 h-9 rounded-md border border-white/40 flex items-center justify-center hover:bg-white/10"
-                    aria-label="Open staff menu"
-                  >
-                    ☰
-                  </button>
-                </div>
+                  <p className="text-xs">{showStaffMobileMenu ? '▲' : '▼'}</p>
+                </button>
 
                 {showStaffMobileMenu && (
                   <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-52 overflow-hidden">
@@ -910,50 +776,6 @@ const StallMenu = () => {
                         className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                       >
                         Store Profile
-                      </button>
-                    )}
-                    {activeTab !== 'products' && (
-                      <button
-                        onClick={() => {
-                          setActiveTab('products');
-                          setShowStaffMobileMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                      >
-                        Products
-                      </button>
-                    )}
-                    {activeTab !== 'orders' && (
-                      <button
-                        onClick={() => {
-                          setActiveTab('orders');
-                          setShowStaffMobileMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                      >
-                        Orders
-                      </button>
-                    )}
-                    {activeTab !== 'sales' && (
-                      <button
-                        onClick={() => {
-                          setActiveTab('sales');
-                          setShowStaffMobileMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                      >
-                        Sales
-                      </button>
-                    )}
-                    {activeTab !== 'settings' && (
-                      <button
-                        onClick={() => {
-                          setActiveTab('settings');
-                          setShowStaffMobileMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                      >
-                        Settings
                       </button>
                     )}
                     <button
@@ -1004,6 +826,39 @@ const StallMenu = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="sm:hidden border-t border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            <div className="px-3 py-3 grid grid-cols-4 gap-2 text-[11px] font-bold tracking-wide">
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`relative w-full text-center pb-1.5 truncate ${activeTab === 'products' ? 'text-white' : 'text-white/80'}`}
+              >
+                PRODUCTS
+                {activeTab === 'products' && <span className="absolute left-0 right-0 -bottom-[2px] h-1.5 rounded-sm bg-[#f4c542]" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`relative w-full text-center pb-1.5 truncate ${activeTab === 'orders' ? 'text-white' : 'text-white/80'}`}
+              >
+                ORDERS
+                {activeTab === 'orders' && <span className="absolute left-0 right-0 -bottom-[2px] h-1.5 rounded-sm bg-[#f4c542]" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('sales')}
+                className={`relative w-full text-center pb-1.5 truncate ${activeTab === 'sales' ? 'text-white' : 'text-white/80'}`}
+              >
+                SALES
+                {activeTab === 'sales' && <span className="absolute left-0 right-0 -bottom-[2px] h-1.5 rounded-sm bg-[#f4c542]" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`relative w-full text-center pb-1.5 truncate ${activeTab === 'settings' ? 'text-white' : 'text-white/80'}`}
+              >
+                SETTINGS
+                {activeTab === 'settings' && <span className="absolute left-0 right-0 -bottom-[2px] h-1.5 rounded-sm bg-[#f4c542]" />}
+              </button>
             </div>
           </div>
         </header>

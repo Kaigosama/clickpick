@@ -66,6 +66,23 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
     }
   };
 
+  const handleQuantityInputChange = (rawValue) => {
+    if (rawValue === '') {
+      setQuantity(1);
+      return;
+    }
+
+    const parsed = Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsed)) return;
+    handleQuantityChange(parsed);
+  };
+
+  const blockInvalidNumberKeys = (e) => {
+    if (['e', 'E', '+', '-', '.', ','].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   // Calculate estimated time based on quantity (approximate)
   // Actual time will be calculated by backend based on queue
   const estimateTime = () => {
@@ -78,21 +95,13 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-[#8B0000] text-white py-4 px-4 sm:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onClose}
-              className="text-2xl hover:opacity-80"
-            >
-              ←
-            </button>
-            <h1 className="text-xl sm:text-2xl font-bold">Product Details</h1>
-          </div>
+        <div className="bg-[#8B0000] text-white py-3 sm:py-4 px-4 sm:px-6 flex items-center justify-between">
+          <h1 className="text-lg sm:text-2xl font-bold truncate">Menu Details</h1>
           <button
             onClick={onClose}
-            className="text-2xl hover:opacity-80"
+            className="text-xl sm:text-2xl hover:opacity-80"
           >
             ✕
           </button>
@@ -100,10 +109,10 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
 
         {/* Content */}
         <div className="p-4 sm:p-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">{item.name}</h2>
+          <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 break-words">{item.name}</h2>
 
           {/* Product Image / Icon */}
-          <div className="bg-[#8B0000] h-48 rounded-lg flex items-center justify-center text-8xl mb-8 border-2 border-gray-300 overflow-hidden p-2">
+          <div className="bg-[#8B0000] h-40 sm:h-48 rounded-lg flex items-center justify-center text-6xl sm:text-8xl mb-6 sm:mb-8 border-2 border-gray-300 overflow-hidden p-2">
             {item.image ? (
               <img
                 src={toServerAssetUrl(item.image)}
@@ -115,14 +124,20 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
             )}
           </div>
 
-          {/* Store Info */}
-          <div className="mb-8 pb-6 border-b-2 border-gray-200">
-            <p className="text-lg font-bold text-gray-900 mb-2">{stall.name}</p>
-            <p className="text-4xl font-bold text-gray-900">₱{effectivePrice.toFixed(2)}</p>
+          {/* Price */}
+          <div className="mb-6 sm:mb-8 pb-5 sm:pb-6 border-b-2 border-gray-200">
+            <p className="text-3xl sm:text-4xl font-bold text-gray-900">₱{effectivePrice.toFixed(2)}</p>
+          </div>
+
+          {/* Product Details */}
+          <div className="mb-6 sm:mb-8 pb-5 sm:pb-6 border-b-2 border-gray-200">
+            <p className="text-sm sm:text-base text-gray-700 leading-relaxed break-words">
+              {String(item.description || '').trim() || 'No details available for this menu item.'}
+            </p>
           </div>
 
           {isMainItem && (
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <label className="block text-sm font-semibold text-gray-700 mb-3">RICE OPTION</label>
               {riceOptions.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -131,7 +146,7 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
                       type="button"
                       key={option.value}
                       onClick={() => setSelectedRiceOption(option.value)}
-                      className={`border-2 rounded py-2 px-3 font-semibold text-sm transition-colors ${
+                      className={`border-2 rounded py-2 px-3 font-semibold text-xs sm:text-sm transition-colors ${
                         selectedRiceOption === option.value
                           ? 'border-[#8B0000] text-[#8B0000] bg-red-50'
                           : 'border-gray-300 text-gray-700 hover:border-[#8B0000]'
@@ -148,7 +163,7 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           )}
 
           {parsedVariationOptions.length > 0 && (
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <label className="block text-sm font-semibold text-gray-700 mb-3">VARIATION</label>
               <select
                 value={selectedVariation}
@@ -165,29 +180,34 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           )}
 
           {/* Quantity Selector */}
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <label className="block text-sm font-semibold text-gray-700 mb-3">QUANTITY</label>
             <p className={`text-xs mb-2 ${maxAvailableQuantity > 0 ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>
               {maxAvailableQuantity > 0 ? `Available: ${maxAvailableQuantity}` : 'Not Available'}
             </p>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4">
               <button
                 onClick={() => handleQuantityChange(quantity - 1)}
-                className="w-10 h-10 border-2 border-gray-400 rounded flex items-center justify-center text-lg font-bold hover:border-[#8B0000] transition-colors"
+                className="w-10 h-10 rounded-md bg-[#8B0000] text-white text-xl font-bold shadow-sm hover:bg-red-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
+                disabled={quantity <= 1}
               >
                 −
               </button>
               <input
                 type="number"
                 value={quantity}
-                onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                className="w-16 text-center border-2 border-gray-400 rounded py-2 font-bold text-lg"
+                onChange={(e) => handleQuantityInputChange(e.target.value)}
+                onKeyDown={blockInvalidNumberKeys}
+                inputMode="numeric"
+                className="w-20 sm:w-16 text-center border border-gray-300 rounded-md py-2 font-semibold text-lg text-gray-900"
                 min="1"
+                step="1"
                 max={Math.max(1, maxAvailableQuantity)}
               />
               <button
                 onClick={() => handleQuantityChange(quantity + 1)}
-                className="w-10 h-10 border-2 border-gray-400 rounded flex items-center justify-center text-lg font-bold hover:border-[#8B0000] transition-colors"
+                className="w-10 h-10 rounded-md bg-[#8B0000] text-white text-xl font-bold shadow-sm hover:bg-red-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
+                disabled={quantity >= Math.max(1, maxAvailableQuantity)}
               >
                 +
               </button>
@@ -195,10 +215,10 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           </div>
 
           {/* Order Details */}
-          <div className="space-y-4 mb-8 pb-6 border-b-2 border-gray-200">
+          <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 pb-5 sm:pb-6 border-b-2 border-gray-200">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-gray-900">TOTAL</span>
-              <span className="text-2xl font-bold text-gray-900">₱{(effectivePrice * quantity).toFixed(2)}</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-900">₱{(effectivePrice * quantity).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="font-semibold text-gray-900">ESTIMATED TIME</span>
@@ -207,17 +227,17 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <button
               onClick={onClose}
-              className="flex-1 py-3 px-6 border-2 border-gray-400 text-gray-900 font-bold rounded-lg hover:bg-gray-50 transition-colors text-lg"
+              className="flex-1 py-3 px-4 sm:px-6 border-2 border-gray-400 text-gray-900 font-bold rounded-lg hover:bg-gray-50 transition-colors text-base sm:text-lg"
             >
               Cancel
             </button>
             <button
               onClick={handleAddToBasket}
               disabled={!item.isAvailable || maxAvailableQuantity <= 0 || (isMainItem && riceOptions.length === 0)}
-              className={`flex-1 py-3 px-6 font-bold rounded-lg text-lg transition-colors ${
+              className={`flex-1 py-3 px-4 sm:px-6 font-bold rounded-lg text-base sm:text-lg transition-colors ${
                 item.isAvailable && maxAvailableQuantity > 0 && (!isMainItem || riceOptions.length > 0)
                   ? 'bg-[#8B0000] text-white hover:bg-red-800'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
