@@ -26,6 +26,7 @@ const Profile = () => {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
+  const [pwWrongPassword, setPwWrongPassword] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -133,6 +134,7 @@ const Profile = () => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPwError('');
+    setPwWrongPassword(false);
     setPwSuccess('');
     if (pwData.newPassword !== pwData.confirmPassword) {
       setPwError('New passwords do not match.');
@@ -157,6 +159,9 @@ const Profile = () => {
       }, 1500);
     } catch (err) {
       setPwError(err.response?.data?.message || 'Error changing password.');
+      if (err.response?.status === 400 && err.response?.data?.message === 'Wrong current password.') {
+        setPwWrongPassword(true);
+      }
     } finally {
       setPwLoading(false);
     }
@@ -524,7 +529,7 @@ const Profile = () => {
             <h2 className="text-xl font-bold text-gray-900 mb-1">Change Password</h2>
             <p className="text-sm text-gray-500 mb-6">Enter your current password then set a new one.</p>
 
-            {pwError && (
+            {pwError && !pwWrongPassword && (
               <div className="bg-red-100 text-red-800 rounded-lg px-4 py-3 mb-4 text-sm font-medium">
                 {pwError}
               </div>
@@ -537,15 +542,18 @@ const Profile = () => {
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-1">Current Password</label>
+                <label className={`block text-sm font-semibold mb-1 ${pwWrongPassword ? 'text-red-600' : 'text-gray-900'}`}>Current Password</label>
                 <input
                   type="password"
                   value={pwData.currentPassword}
-                  onChange={(e) => setPwData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                  onChange={(e) => { setPwData(prev => ({ ...prev, currentPassword: e.target.value })); setPwWrongPassword(false); setPwError(''); }}
+                  className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none ${pwWrongPassword ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-[#8B0000]'}`}
                   placeholder="Enter current password"
                   required
                 />
+                {pwWrongPassword && (
+                  <p className="text-red-600 text-xs font-semibold mt-1">Wrong password</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-1">New Password</label>
@@ -579,7 +587,7 @@ const Profile = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowChangePassword(false); setPwData({ currentPassword: '', newPassword: '', confirmPassword: '' }); setPwError(''); }}
+                  onClick={() => { setShowChangePassword(false); setPwData({ currentPassword: '', newPassword: '', confirmPassword: '' }); setPwError(''); setPwWrongPassword(false); }}
                   className="flex-1 bg-gray-200 text-gray-900 font-bold py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Cancel
