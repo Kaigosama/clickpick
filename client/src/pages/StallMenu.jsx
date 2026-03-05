@@ -11,6 +11,15 @@ import { getSocket } from '../services/socket.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
 import { jsPDF } from 'jspdf';
 
+const normalizeStoreOpen = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return true;
+  const normalized = String(value).trim().toLowerCase();
+  if (['false', '0', 'closed', 'no'].includes(normalized)) return false;
+  if (['true', '1', 'open', 'yes'].includes(normalized)) return true;
+  return true;
+};
+
 const StallMenu = () => {
   const { stallId } = useParams();
   const location = useLocation();
@@ -38,6 +47,8 @@ const StallMenu = () => {
   const [uploadingRefundForOrder, setUploadingRefundForOrder] = useState('');
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [gcashNumber, setGcashNumber] = useState('');
+  const [storeOpen, setStoreOpen] = useState(true);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
   const defaultStalls = [
@@ -54,14 +65,17 @@ const StallMenu = () => {
 
   const stall = stalls.find((entry) => entry.id === stallId) || {
     name: 'Store',
-    logo: 'ST'
+    logo: 'ST',
+    storeOpen: true
   };
   const isStaff = user?.role === 'stall_staff';
   const isStoreProfilePage = location.pathname === '/profile';
+  const isStoreClosedForCustomer = !isStaff && normalizeStoreOpen(stall?.storeOpen) === false;
 
   useEffect(() => {
     setGcashNumber(user?.gcashNumber || '');
-  }, [user?.gcashNumber]);
+    setStoreOpen(user?.storeOpen !== false);
+  }, [user?.gcashNumber, user?.storeOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -129,12 +143,25 @@ const StallMenu = () => {
       }
     };
 
+    const handleStoreStatusUpdated = (payload) => {
+      const updatedStallId = String(payload?.stallId || '');
+      if (!updatedStallId) return;
+
+      setStalls((prev) => prev.map((entry) => (
+        String(entry.id) === updatedStallId
+          ? { ...entry, storeOpen: normalizeStoreOpen(payload?.storeOpen) }
+          : entry
+      )));
+    };
+
     socket.emit('join_stall', stallId);
     socket.on('menu:updated', handleMenuUpdated);
+    socket.on('store:status_updated', handleStoreStatusUpdated);
 
     return () => {
       socket.emit('leave_stall', stallId);
       socket.off('menu:updated', handleMenuUpdated);
+      socket.off('store:status_updated', handleStoreStatusUpdated);
     };
   }, [user, stallId]);
 
@@ -174,7 +201,8 @@ const StallMenu = () => {
           id: entry._id,
           name: entry.name,
           logo: defaultStalls[index % defaultStalls.length].logo,
-          logoUrl: entry.logoUrl || null
+          logoUrl: entry.logoUrl || null,
+          storeOpen: normalizeStoreOpen(entry.storeOpen)
         }));
         setStalls(mappedStalls);
       } catch (err) {
@@ -379,6 +407,11 @@ const StallMenu = () => {
   };
 
   const handleCheckout = async () => {
+    if (isStoreClosedForCustomer) {
+      alert('This store is currently closed and cannot accept orders.');
+      return;
+    }
+
     if (cartItems.length === 0) {
       alert("Cart is empty!");
       return;
@@ -437,25 +470,39 @@ const StallMenu = () => {
     e.preventDefault();
     if (!user?._id) return;
 
+    const confirmed = window.confirm('Are you sure you want to save these store settings?');
+    if (!confirmed) {
+      return;
+    }
+
     setSavingSettings(true);
     setSettingsMessage('');
 
     try {
       const response = await api.put('/auth/profile', {
         userId: user._id,
-        gcashNumber: gcashNumber.trim()
+        gcashNumber: gcashNumber.trim(),
+        storeOpen
       });
 
       if (response.data?.user) {
         updateUser(response.data.user);
       }
 
-      setSettingsMessage('GCash number saved successfully.');
+      setSettingsMessage('Store settings saved successfully.');
+      setIsEditingSettings(false);
     } catch (err) {
       setSettingsMessage(`Failed to save settings: ${err.response?.data?.message || err.message}`);
     } finally {
       setSavingSettings(false);
     }
+  };
+
+  const handleCancelSettingsEdit = () => {
+    setStoreOpen(user?.storeOpen !== false);
+    setGcashNumber(user?.gcashNumber || '');
+    setSettingsMessage('');
+    setIsEditingSettings(false);
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -1467,7 +1514,7 @@ const StallMenu = () => {
         ) : isStaff && activeTab === 'settings' ? (
           <div className="bg-white rounded-lg shadow border border-gray-200 p-6 md:p-8 max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Store Settings</h2>
-            <p className="text-gray-600 mb-6">Update the GCash number shown to customers during payment.</p>
+            <p className="text-gray-600 mb-6">Update your store status and GCash number shown to customers during payment.</p>
 
             {settingsMessage && (
               <div className={`mb-4 rounded-lg p-3 text-sm font-semibold ${settingsMessage.toLowerCase().includes('failed') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -1475,30 +1522,82 @@ const StallMenu = () => {
               </div>
             )}
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className="rounded-lg border border-gray-300 bg-gray-50 p-4">
-                <p className="text-xs font-semibold text-gray-600 mb-1">CURRENT GCASH NUMBER SHOWN TO CUSTOMERS</p>
-                <p className="text-xl font-bold text-gray-900 tracking-wide">{user?.gcashNumber?.trim() || 'Not set'}</p>
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div className="flex justify-end">
+                {!isEditingSettings ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingSettings(true);
+                      setSettingsMessage('');
+                    }}
+                    className="px-4 py-2 rounded-lg font-semibold border border-gray-400 text-gray-800 hover:bg-gray-100"
+                  >
+                    Edit Settings
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCancelSettingsEdit}
+                    className="px-4 py-2 rounded-lg font-semibold border border-gray-400 text-gray-800 hover:bg-gray-100"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">GCash Number</label>
-                <input
-                  type="text"
-                  value={gcashNumber}
-                  onChange={(e) => setGcashNumber(e.target.value)}
-                  placeholder="09XXXXXXXXX"
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
-                />
+              <div className="rounded-lg border-2 border-gray-300 p-4 space-y-3">
+                <h3 className="text-lg font-bold text-gray-900">Store Status</h3>
+                <div className="rounded-lg border border-gray-300 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">CURRENT STORE STATUS</p>
+                  <p className={`text-xl font-bold tracking-wide ${storeOpen ? 'text-green-700' : 'text-red-700'}`}>
+                    {storeOpen ? 'OPEN (Available)' : 'CLOSED'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Store Availability</label>
+                  <select
+                    value={storeOpen ? 'open' : 'closed'}
+                    onChange={(e) => setStoreOpen(e.target.value === 'open')}
+                    disabled={!isEditingSettings}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000] bg-white disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <option value="open">Open (Available to customers)</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={savingSettings}
-                className={`px-5 py-2 rounded-lg font-semibold text-white ${savingSettings ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8B0000] hover:bg-red-800'}`}
-              >
-                {savingSettings ? 'Saving...' : 'Save Settings'}
-              </button>
+              <div className="rounded-lg border-2 border-gray-300 p-4 space-y-3">
+                <h3 className="text-lg font-bold text-gray-900">GCash Number</h3>
+                <div className="rounded-lg border border-gray-300 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold text-gray-600 mb-1">CURRENT GCASH NUMBER SHOWN TO CUSTOMERS</p>
+                  <p className="text-xl font-bold text-gray-900 tracking-wide">{user?.gcashNumber?.trim() || 'Not set'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">GCash Number</label>
+                  <input
+                    type="text"
+                    value={gcashNumber}
+                    onChange={(e) => setGcashNumber(e.target.value)}
+                    disabled={!isEditingSettings}
+                    placeholder="09XXXXXXXXX"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000] disabled:bg-gray-100 disabled:text-gray-500"
+                  />
+                </div>
+              </div>
+
+              {isEditingSettings && (
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className={`px-5 py-2 rounded-lg font-semibold text-white ${savingSettings ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8B0000] hover:bg-red-800'}`}
+                >
+                  {savingSettings ? 'Saving...' : 'Save Settings'}
+                </button>
+              )}
             </form>
           </div>
         ) : (
@@ -1528,9 +1627,20 @@ const StallMenu = () => {
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">{stall.name}</h1>
                   <p className="text-gray-600 mt-1">Menu Items</p>
+                  {!isStaff && (
+                    <p className={`text-sm font-semibold mt-1 ${isStoreClosedForCustomer ? 'text-red-600' : 'text-green-600'}`}>
+                      {isStoreClosedForCustomer ? 'Store is currently closed' : 'Store is open'}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
+
+            {isStoreClosedForCustomer && (
+              <div className="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                Ordering is currently unavailable because this store is closed.
+              </div>
+            )}
 
             {loading ? (
               <div className="text-center py-12">Loading menu items...</div>
@@ -1641,8 +1751,12 @@ const StallMenu = () => {
                             return (
                               <div 
                                 key={item._id}
-                                onClick={() => setSelectedProduct(item)}
-                                className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:shadow-xl transition-shadow overflow-hidden flex flex-col self-start cursor-pointer hover:border-[#8B0000]"
+                                onClick={() => {
+                                  if (!isStoreClosedForCustomer) {
+                                    setSelectedProduct(item);
+                                  }
+                                }}
+                                className={`bg-white rounded-lg border-2 border-gray-300 shadow-lg transition-shadow overflow-hidden flex flex-col self-start ${isStoreClosedForCustomer ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-xl hover:border-[#8B0000]'}`}
                               >
                                 <div className="bg-[#8B0000] w-full max-w-[110px] sm:max-w-none aspect-square mx-auto sm:mx-0 flex items-center justify-center text-2xl sm:text-5xl border-b-2 border-gray-300 overflow-hidden p-1">
                                   {item.image ? (
@@ -1679,6 +1793,7 @@ const StallMenu = () => {
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (isStoreClosedForCustomer) return;
                                             setItemQuantities(prev => ({
                                               ...prev,
                                               [item._id]: Math.max(0, quantity - 1)
@@ -1692,6 +1807,7 @@ const StallMenu = () => {
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (isStoreClosedForCustomer) return;
                                             setItemQuantities(prev => ({
                                               ...prev,
                                               [item._id]: Math.min(availableQty, quantity + 1)
@@ -1710,9 +1826,13 @@ const StallMenu = () => {
                                   )}
 
                                   <button 
-                                    disabled={!isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)}
+                                    disabled={isStoreClosedForCustomer || !isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)}
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (isStoreClosedForCustomer) {
+                                        alert('This store is currently closed and cannot accept orders.');
+                                        return;
+                                      }
                                       if (requiresVariationChoice || requiresRiceChoice) {
                                         setSelectedProduct(item);
                                         return;
@@ -1730,7 +1850,7 @@ const StallMenu = () => {
                                       }));
                                     }}
                                     className={`w-full py-1.5 sm:py-2 rounded-lg font-bold transition-all text-sm sm:text-sm ${
-                                      !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
+                                      isStoreClosedForCustomer || !item.isAvailable || (!requiresRiceChoice && !requiresVariationChoice && quantity === 0)
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                         : 'bg-[#8B0000] text-white hover:bg-red-800'
                                     }`}
@@ -1756,10 +1876,16 @@ const StallMenu = () => {
       {!isStaff && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
-            onClick={() => navigate('/cart')}
+            onClick={() => {
+              if (isStoreClosedForCustomer) {
+                alert('This store is currently closed and cannot accept orders.');
+                return;
+              }
+              navigate('/cart');
+            }}
             onMouseEnter={() => setShowCartPreview(true)}
             onMouseLeave={() => setShowCartPreview(false)}
-            className="bg-[#8B0000] text-white w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold hover:bg-red-800 transition-all shadow-lg hover:shadow-xl"
+            className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold transition-all shadow-lg ${isStoreClosedForCustomer ? 'bg-gray-400 text-gray-100 cursor-not-allowed' : 'bg-[#8B0000] text-white hover:bg-red-800 hover:shadow-xl'}`}
             title="View Basket"
           >
             🛒
@@ -1820,6 +1946,10 @@ const StallMenu = () => {
           stallId={stallId}
           onClose={() => setSelectedProduct(null)}
           onAddToCart={(item) => {
+            if (isStoreClosedForCustomer) {
+              alert('This store is currently closed and cannot accept orders.');
+              return;
+            }
             addToCart(item);
           }}
         />

@@ -312,8 +312,13 @@ router.post('/', async (req, res) => {
     }
 
     const [resolvedStallId] = stallIds;
-    const store = await User.findById(resolvedStallId).select('name');
+    const store = await User.findById(resolvedStallId).select('name storeOpen');
     const storeName = store?.name || 'Store';
+
+    if (!store || store.storeOpen === false) {
+      return res.status(403).json({ message: 'This store is currently closed and cannot accept orders.' });
+    }
+
     const { orderNumber, queueNumber } = await getNextOrderIdentifiers(resolvedStallId);
     const estimatedTime = await calculateEstimatedTime(req.body.items, resolvedStallId);
 

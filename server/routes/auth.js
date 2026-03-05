@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const User = require('../models/User');
+const { emitStoreStatusUpdated } = require('../socket');
 
 const SALT_ROUNDS = 10;
 
@@ -35,6 +36,14 @@ const toImageDataUrl = (file) => {
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const normalizeBoolean = (value, fallback = true) => {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'open', 'yes'].includes(normalized)) return true;
+  if (['false', '0', 'closed', 'no'].includes(normalized)) return false;
+  return fallback;
+};
 
 // Helper function to generate JWT
 const generateToken = (userId) => {
@@ -174,7 +183,7 @@ router.post('/forgot-password', async (req, res) => {
 router.get('/stalls', async (req, res) => {
   try {
     const stalls = await User.find({ role: 'stall_staff' })
-      .select('_id name logoUrl gcashNumber')
+      .select('_id name logoUrl gcashNumber storeOpen')
       .sort({ createdAt: 1 });
 
     res.status(200).json(stalls);
@@ -186,7 +195,7 @@ router.get('/stalls', async (req, res) => {
 // UPDATE PROFILE (Customer or Stall Staff)
 router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
   try {
-    const { userId, name, firstName, lastName, email, phone, gcashNumber, password: newPassword } = req.body;
+    const { userId, name, firstName, lastName, email, phone, gcashNumber, password: newPassword, storeOpen } = req.body;
     if (!userId) {
       return res.status(400).json({ message: 'Missing userId' });
     }
@@ -195,6 +204,8 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
     if (!existingUser) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    const previousStoreOpen = normalizeBoolean(existingUser.storeOpen, true);
 
     if (email !== undefined && email !== existingUser.email) {
       return res.status(400).json({ message: 'Email change is not allowed.' });
@@ -214,6 +225,9 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
     if (gcashNumber !== undefined) {
       update.gcashNumber = String(gcashNumber).trim();
     }
+    if (storeOpen !== undefined && existingUser.role === 'stall_staff') {
+      update.storeOpen = normalizeBoolean(storeOpen, previousStoreOpen);
+    }
     if (newPassword !== undefined && String(newPassword).trim() !== '') {
       if (String(newPassword).trim().length < 6) {
         return res.status(400).json({ message: 'Password must be at least 6 characters.' });
@@ -227,11 +241,20 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: update },
-      { returnDocument: 'after' }
+      { new: true }
     );
 
     if (!updatedUser) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    const currentStoreOpen = normalizeBoolean(updatedUser.storeOpen, true);
+    const storeOpenWasSubmitted = storeOpen !== undefined;
+    if (existingUser.role === 'stall_staff' && (storeOpenWasSubmitted || previousStoreOpen !== currentStoreOpen)) {
+      emitStoreStatusUpdated({
+        stallId: updatedUser._id,
+        storeOpen: currentStoreOpen
+      });
     }
 
     const { password: savedPassword, ...userWithoutPassword } = updatedUser._doc;

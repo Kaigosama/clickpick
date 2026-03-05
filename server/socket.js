@@ -36,7 +36,18 @@ const emitMenuUpdated = ({ stallId, action, item }) => {
   });
 };
 
+const emitStoreStatusUpdated = ({ stallId, storeOpen }) => {
+  if (!io || !stallId) return;
+
+  io.emit('store:status_updated', {
+    stallId: String(stallId),
+    storeOpen: storeOpen !== false,
+    updatedAt: new Date().toISOString()
+  });
+};
+
 module.exports = {
   setSocketServer,
-  emitMenuUpdated
+  emitMenuUpdated,
+  emitStoreStatusUpdated
 };

@@ -5,6 +5,16 @@ import { useCart } from '../context/CartContext.jsx';
 import CartPreview from '../components/CartPreview.jsx';
 import api from '../services/api.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
+import { getSocket } from '../services/socket.js';
+
+const normalizeStoreOpen = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return true;
+  const normalized = String(value).trim().toLowerCase();
+  if (['false', '0', 'closed', 'no'].includes(normalized)) return false;
+  if (['true', '1', 'open', 'yes'].includes(normalized)) return true;
+  return true;
+};
 
 const Menu = () => {
   const navigate = useNavigate();
@@ -32,7 +42,8 @@ const Menu = () => {
         const mappedStalls = list.map((stall) => ({
           id: stall._id,
           name: stall.name,
-          logoUrl: stall.logoUrl || null
+          logoUrl: stall.logoUrl || null,
+          storeOpen: normalizeStoreOpen(stall.storeOpen)
         }));
         setStalls(mappedStalls);
       } catch (err) {
@@ -41,6 +52,27 @@ const Menu = () => {
     };
 
     fetchStalls();
+  }, []);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleStoreStatusUpdated = (payload) => {
+      const updatedStallId = String(payload?.stallId || '');
+      if (!updatedStallId) return;
+
+      setStalls((prev) => prev.map((entry) => (
+        String(entry.id) === updatedStallId
+          ? { ...entry, storeOpen: normalizeStoreOpen(payload?.storeOpen) }
+          : entry
+      )));
+    };
+
+    socket.on('store:status_updated', handleStoreStatusUpdated);
+
+    return () => {
+      socket.off('store:status_updated', handleStoreStatusUpdated);
+    };
   }, []);
 
   const handleStallClick = (stallId) => {
@@ -202,7 +234,8 @@ const Menu = () => {
               <button
                 key={stall.id}
                 onClick={() => handleStallClick(stall.id)}
-                className="bg-white rounded-lg shadow-md sm:shadow-lg hover:shadow-xl transition-shadow p-3 sm:p-6 flex flex-col items-center justify-center text-center border-2 border-gray-200 hover:border-[#8B0000] cursor-pointer"
+                className={`bg-white rounded-lg shadow-md sm:shadow-lg transition-shadow p-3 sm:p-6 flex flex-col items-center justify-center text-center border-2 ${stall.storeOpen ? 'border-gray-200 hover:border-[#8B0000] hover:shadow-xl cursor-pointer' : 'border-gray-300 opacity-75 cursor-not-allowed'}`}
+                disabled={!stall.storeOpen}
               >
                 {/* Logo/Icon */}
                 <div className="w-14 h-14 sm:w-24 sm:h-24 bg-[#8B0000] rounded flex items-center justify-center mb-2 sm:mb-4 text-2xl sm:text-5xl overflow-hidden">
@@ -221,6 +254,9 @@ const Menu = () => {
                 <h2 className="text-sm sm:text-xl font-bold text-gray-900 leading-tight line-clamp-2 min-h-[2rem] sm:min-h-0">
                   {stall.name}
                 </h2>
+                <p className={`mt-1 text-xs sm:text-sm font-semibold ${stall.storeOpen ? 'text-green-600' : 'text-red-600'}`}>
+                  {stall.storeOpen ? 'Open' : 'Closed'}
+                </p>
               </button>
             ))
           )}

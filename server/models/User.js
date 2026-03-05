@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema({
   },
   phone: { type: String },
   gcashNumber: { type: String },
+  storeOpen: { type: Boolean, default: true },
   logoUrl: { type: String },
   logoPath: { type: String }
 }, { timestamps: true });
