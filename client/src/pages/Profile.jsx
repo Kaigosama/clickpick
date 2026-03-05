@@ -10,6 +10,8 @@ const Profile = () => {
   const isStaff = user?.role === 'stall_staff';
   const [formData, setFormData] = useState({
     name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     password: '',
@@ -35,6 +37,8 @@ const Profile = () => {
     
     setFormData({
       name: user.name || '',
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
       email: user.email || '',
       phone: user.phone || '',
       password: '',
@@ -47,10 +51,15 @@ const Profile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'firstName' || name === 'lastName') {
+        const first = name === 'firstName' ? value : prev.firstName;
+        const last = name === 'lastName' ? value : prev.lastName;
+        updated.name = `${first} ${last}`.trim();
+      }
+      return updated;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -83,6 +92,10 @@ const Profile = () => {
           userId: user._id,
           name: formData.name
         };
+        if (!isStaff) {
+          payload.firstName = formData.firstName;
+          payload.lastName = formData.lastName;
+        }
         if (isStaff && formData.password) {
           payload.password = formData.password;
         }
@@ -270,9 +283,15 @@ const Profile = () => {
           {/* Customer view mode */}
           {!isStaff && !isEditing ? (
             <div className="space-y-5">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</p>
-                <p className="text-lg font-medium text-gray-900">{user.name}</p>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">First Name</p>
+                  <p className="text-lg font-medium text-gray-900">{user.firstName || user.name?.split(' ')[0] || <span className="text-gray-400">Not set</span>}</p>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Last Name</p>
+                  <p className="text-lg font-medium text-gray-900">{user.lastName || user.name?.split(' ').slice(1).join(' ') || <span className="text-gray-400">Not set</span>}</p>
+                </div>
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</p>
@@ -311,20 +330,45 @@ const Profile = () => {
           ) : (
           <>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Store/Full Name */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                {isStaff ? 'Store Name' : 'Full Name'}
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
-                required
-              />
-            </div>
+            {/* Store Name (staff) or First/Last Name (customer) */}
+            {isStaff ? (
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Store Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                  required
+                />
+              </div>
+            ) : (
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">First Name</label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#8B0000]"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Email (read-only) */}
             <div>

@@ -13,6 +13,8 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState(''); 
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [logoFile, setLogoFile] = useState(null);
   const [phone, setPhone] = useState('');
   
@@ -92,7 +94,7 @@ const Auth = () => {
         payload = formData;
         config = { headers: { 'Content-Type': 'multipart/form-data' } };
       } else {
-        payload = { name, email, password, role: selectedRole, phone };
+        payload = { firstName, lastName, email, password, role: selectedRole, phone };
       }
 
       // 2. API Call using our service (automatically handles Base URL)
@@ -188,14 +190,35 @@ const Auth = () => {
             {/* Input Form */}
             <form onSubmit={handleSubmit} className="w-full space-y-6">
               {!isLogin && !isForgotMode && (
+                selectedRole === 'stall_staff' ? (
                   <input 
                     type="text" 
-                    placeholder={selectedRole === 'stall_staff' ? 'Store Name' : 'Full Name'} 
+                    placeholder="Store Name"
                     value={name} 
                     onChange={e => setName(e.target.value)} 
                     required
                     className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
                   />
+                ) : (
+                  <div className="flex gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="First Name"
+                      value={firstName} 
+                      onChange={e => setFirstName(e.target.value)} 
+                      required
+                      className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Last Name"
+                      value={lastName} 
+                      onChange={e => setLastName(e.target.value)} 
+                      required
+                      className="w-full bg-transparent border-2 border-white/40 p-3 text-white placeholder-white/60 focus:outline-none focus:border-white transition-all"
+                    />
+                  </div>
+                )
               )}
 
               {!isLogin && !isForgotMode && selectedRole === 'stall_staff' && (
@@ -300,6 +323,8 @@ const Auth = () => {
                     setPassword('');
                     setConfirmPassword('');
                     setName('');
+                    setFirstName('');
+                    setLastName('');
                   }} 
                   className="w-full bg-transparent border border-white/30 py-3 text-white/60 font-semibold hover:bg-white/5 transition-all uppercase tracking-[0.1em] text-xs active:scale-95"
                 >

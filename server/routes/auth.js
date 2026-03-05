@@ -68,11 +68,28 @@ router.post('/register', uploadLogoIfMultipart, async (req, res) => {
 
     // 2. Create new user
     const hashedPassword = await bcrypt.hash(req.body.password, SALT_ROUNDS);
+    const role = req.body.role || 'customer';
+    let firstName, lastName, fullName;
+    if (role === 'customer') {
+      firstName = String(req.body.firstName || '').trim();
+      lastName = String(req.body.lastName || '').trim();
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First name and last name are required.' });
+      }
+      fullName = `${firstName} ${lastName}`;
+    } else {
+      fullName = String(req.body.name || '').trim();
+      if (!fullName) {
+        return res.status(400).json({ message: 'Store name is required.' });
+      }
+    }
     const newUser = new User({
-      name: req.body.name,
+      firstName: role === 'customer' ? firstName : undefined,
+      lastName: role === 'customer' ? lastName : undefined,
+      name: fullName,
       email: normalizedEmail,
       password: hashedPassword,
-      role: req.body.role || 'customer', // Default to customer
+      role,
       phone: req.body.phone,
       gcashNumber: req.body.gcashNumber,
       logoUrl: req.file ? toImageDataUrl(req.file) : undefined
@@ -169,7 +186,7 @@ router.get('/stalls', async (req, res) => {
 // UPDATE PROFILE (Customer or Stall Staff)
 router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
   try {
-    const { userId, name, email, phone, gcashNumber, password: newPassword } = req.body;
+    const { userId, name, firstName, lastName, email, phone, gcashNumber, password: newPassword } = req.body;
     if (!userId) {
       return res.status(400).json({ message: 'Missing userId' });
     }
@@ -184,7 +201,15 @@ router.put('/profile', uploadLogoIfMultipart, async (req, res) => {
     }
 
     const update = {};
-    if (name !== undefined) update.name = name;
+    if (existingUser.role === 'customer' && firstName !== undefined && lastName !== undefined) {
+      const trimFirst = String(firstName).trim();
+      const trimLast = String(lastName).trim();
+      update.firstName = trimFirst;
+      update.lastName = trimLast;
+      update.name = `${trimFirst} ${trimLast}`;
+    } else if (name !== undefined) {
+      update.name = name;
+    }
     if (phone !== undefined) update.phone = phone;
     if (gcashNumber !== undefined) {
       update.gcashNumber = String(gcashNumber).trim();
