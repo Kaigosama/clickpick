@@ -26,12 +26,13 @@ const OrderSchema = new mongoose.Schema({
   refundRequired: { type: Boolean, default: false },
   refundStatus: {
     type: String,
-    enum: ['not_required', 'pending', 'proof_sent'],
+    enum: ['not_required', 'pending', 'proof_sent', 'confirmed'],
     default: 'not_required'
   },
   refundProofUrl: { type: String },
   refundProofPath: { type: String },
   refundProofSentAt: { type: Date },
+  refundConfirmedAt: { type: Date },
   status: { 
     type: String, 
     enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'], 

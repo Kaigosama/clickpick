@@ -1,8 +1,6 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const Order = require('../models/Order');
 const SequenceCounter = require('../models/SequenceCounter');
 const MenuItem = require('../models/MenuItem');
@@ -12,23 +10,8 @@ const SalesReport = require('../models/SalesReport');
 const { sendStatusSMS } = require('../utils/smsService');
 const { GRACE_PERIOD_MINUTES, processExpiredReadyOrders } = require('../utils/orderGraceService');
 
-const refundsDir = path.join(__dirname, '../uploads/refunds');
-if (!fs.existsSync(refundsDir)) {
-  fs.mkdirSync(refundsDir, { recursive: true });
-}
-
-const refundStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, refundsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `refund-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
 const uploadRefundProof = multer({
-  storage: refundStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -38,6 +21,13 @@ const uploadRefundProof = multer({
     }
   }
 });
+
+const toImageDataUrl = (file) => {
+  if (!file || !file.buffer || !file.mimetype) {
+    return null;
+  }
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+};
 
 const calculateEstimatedTime = async (items, stallId) => {
   const baseTimePerItem = 3;
@@ -462,27 +452,25 @@ router.post('/:id/refund-proof', uploadRefundProof.single('refundProof'), async 
 
     const order = await Order.findById(req.params.id).populate('customerId', 'phone');
     if (!order) {
-      fs.unlink(req.file.path, () => {});
       return res.status(404).json({ message: 'Order not found' });
     }
 
     if (requester?.role === 'stall_staff' && String(order.stallId) !== String(requester._id)) {
-      fs.unlink(req.file.path, () => {});
       return res.status(403).json({ message: 'You can only submit refund proof for your own store orders' });
     }
 
+    const refundStatus = String(order.refundStatus || '').toLowerCase();
     const canSubmitRefundProof =
-      order.paymentMethod === 'gcash' &&
-      order.refundRequired === true &&
-      order.refundStatus === 'pending';
+      String(order.paymentMethod || '').toLowerCase() === 'gcash' &&
+      String(order.status || '').toLowerCase() === 'cancelled' &&
+      !['proof_sent', 'confirmed'].includes(refundStatus);
 
     if (!canSubmitRefundProof) {
-      fs.unlink(req.file.path, () => {});
-      return res.status(400).json({ message: 'Order is not awaiting manual GCash refund proof' });
+      return res.status(400).json({ message: 'Order is not eligible for refund proof submission' });
     }
 
-    order.refundProofPath = req.file.path;
-    order.refundProofUrl = `/uploads/refunds/${req.file.filename}`;
+    order.refundProofPath = null;
+    order.refundProofUrl = toImageDataUrl(req.file);
     order.refundProofSentAt = new Date();
     order.refundStatus = 'proof_sent';
     order.paymentStatus = 'refunded';
@@ -502,10 +490,73 @@ router.post('/:id/refund-proof', uploadRefundProof.single('refundProof'), async 
       order
     });
   } catch (err) {
-    if (req.file?.path) {
-      fs.unlink(req.file.path, () => {});
-    }
     res.status(500).json({ message: err.message || 'Failed to submit refund proof' });
+  }
+});
+
+router.post('/:id/confirm-refund', async (req, res) => {
+  try {
+    const requester = await getRequesterFromToken(req);
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Only the customer who owns the order can confirm
+    if (!requester || String(order.customerId) !== String(requester._id)) {
+      return res.status(403).json({ message: 'Only the customer can confirm refund receipt' });
+    }
+
+    if (String(order.refundStatus || '').toLowerCase() !== 'proof_sent') {
+      return res.status(400).json({ message: 'Refund proof has not been sent yet' });
+    }
+
+    order.refundStatus = 'confirmed';
+    order.refundConfirmedAt = new Date();
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Refund confirmed by customer.',
+      order
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Failed to confirm refund' });
+  }
+});
+
+router.post('/:id/refund-not-received', async (req, res) => {
+  try {
+    const requester = await getRequesterFromToken(req);
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (!requester || String(order.customerId) !== String(requester._id)) {
+      return res.status(403).json({ message: 'Only the customer can report refund issues' });
+    }
+
+    if (String(order.refundStatus || '').toLowerCase() !== 'proof_sent') {
+      return res.status(400).json({ message: 'No submitted refund proof to review' });
+    }
+
+    order.refundStatus = 'pending';
+    order.paymentStatus = 'paid';
+    order.refundProofUrl = null;
+    order.refundProofPath = null;
+    order.refundProofSentAt = null;
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Refund marked as not received. Store must re-submit proof.',
+      order
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Failed to update refund status' });
   }
 });
 
