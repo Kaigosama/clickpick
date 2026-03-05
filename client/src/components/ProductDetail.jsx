@@ -47,6 +47,8 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
   }, [maxAvailableQuantity, quantity]);
 
   const handleAddToBasket = () => {
+    let blockedByDifferentStall = false;
+
     for (let i = 0; i < quantity; i++) {
       const itemToAdd = {
         ...item,
@@ -57,9 +59,17 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
         price: effectivePrice,
         stallId: stallId || stall?.id || 1
       };
-      onAddToCart(itemToAdd);
+
+      const added = onAddToCart(itemToAdd);
+      if (added === false) {
+        blockedByDifferentStall = true;
+        break;
+      }
     }
-    onClose();
+
+    if (!blockedByDifferentStall) {
+      onClose();
+    }
   };
 
   const handleQuantityChange = (value) => {

@@ -7,6 +7,14 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
 
+  const getItemStallId = (item) => {
+    const rawStallId = item?.stallId ?? item?.stall;
+    if (rawStallId && typeof rawStallId === 'object') {
+      return String(rawStallId._id || rawStallId.id || rawStallId.stallId || '').trim();
+    }
+    return String(rawStallId || '').trim();
+  };
+
   const buildKey = (id, variation = '', rice = '', note = '') => {
     const normalizedNote = String(note || '').trim();
     return `${id}::${variation}::${rice}::${normalizedNote}`;
@@ -35,6 +43,16 @@ export const CartProvider = ({ children }) => {
 
   // Add item to cart
   const addToCart = (item) => {
+    const incomingStallId = getItemStallId(item);
+    const existingStallId = cartItems.length > 0 ? getItemStallId(cartItems[0]) : '';
+
+    if (incomingStallId && existingStallId && incomingStallId !== existingStallId) {
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert('You can only add items from one stall at a time. Please complete or clear your current cart first.');
+      }
+      return false;
+    }
+
     setCartItems((prevItems) => {
       const cartItemKey = getCartItemKey(item);
       const existingItem = prevItems.find((i) => getCartItemKey(i) === cartItemKey);
@@ -45,6 +63,8 @@ export const CartProvider = ({ children }) => {
       }
       return [...prevItems, { ...item, quantity: 1 }];
     });
+
+    return true;
   };
 
   // Remove item from cart

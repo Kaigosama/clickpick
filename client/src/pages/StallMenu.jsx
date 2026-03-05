@@ -1704,7 +1704,10 @@ const StallMenu = () => {
                                             ...item,
                                             stallId: stallId
                                           };
-                                          addToCart(itemToAdd);
+                                          const added = addToCart(itemToAdd);
+                                          if (added === false) {
+                                            return;
+                                          }
                                         }
                                         setItemQuantities(prev => ({
                                           ...prev,
@@ -1811,9 +1814,9 @@ const StallMenu = () => {
           onAddToCart={(item) => {
             if (isStoreClosedForCustomer) {
               alert('This store is currently closed and cannot accept orders.');
-              return;
+              return false;
             }
-            addToCart(item);
+            return addToCart(item);
           }}
         />
       )}
