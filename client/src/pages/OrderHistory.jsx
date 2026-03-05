@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.js';
+import { toServerAssetUrl } from '../services/assetUrl.js';
 import { AuthContext } from '../context/AuthContext.jsx';
 
 const OrderHistory = () => {
@@ -10,6 +11,8 @@ const OrderHistory = () => {
   const [loading, setLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
+  const [selectedRefundOrder, setSelectedRefundOrder] = useState(null);
+  const [processingRefundAction, setProcessingRefundAction] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -40,6 +43,38 @@ const OrderHistory = () => {
     navigate('/');
   };
 
+  const refreshOrders = async () => {
+    const res = await api.get(`/orders/${user?._id}`);
+    setOrders(res.data || []);
+  };
+
+  const handleConfirmRefund = async (orderId) => {
+    setProcessingRefundAction('confirm');
+    try {
+      await api.post(`/orders/${orderId}/confirm-refund`);
+      await refreshOrders();
+      setSelectedRefundOrder(null);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to confirm refund');
+    } finally {
+      setProcessingRefundAction('');
+    }
+  };
+
+  const handleNotReceivedRefund = async (orderId) => {
+    setProcessingRefundAction('not_received');
+    try {
+      await api.post(`/orders/${orderId}/refund-not-received`);
+      await refreshOrders();
+      setSelectedRefundOrder(null);
+      alert('Marked as not received. Store has been asked to re-submit proof.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to mark refund as not received');
+    } finally {
+      setProcessingRefundAction('');
+    }
+  };
+
   const isHistoryOrder = (order) => {
     const status = String(order?.status || '').toLowerCase();
     const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
@@ -61,6 +96,19 @@ const OrderHistory = () => {
     if (paymentStatus === 'rejected') return 'Payment Rejected';
 
     const status = String(order?.status || '').toLowerCase();
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const refundStatus = String(order?.refundStatus || '').toLowerCase();
+    const hasRefundFlow =
+      status === 'cancelled' &&
+      paymentMethod === 'gcash' &&
+      ['pending', 'proof_sent', 'confirmed'].includes(refundStatus);
+
+    if (hasRefundFlow) {
+      if (refundStatus === 'confirmed') return 'Refund Complete';
+      if (refundStatus === 'proof_sent') return 'Check Proof';
+      return 'Refund Processing';
+    }
+
     if (status === 'completed') return 'Completed';
     if (status === 'cancelled') return 'Cancelled';
     return status ? status.toUpperCase() : 'N/A';
@@ -71,6 +119,20 @@ const OrderHistory = () => {
     if (paymentStatus === 'rejected') return 'bg-red-100 text-red-700';
 
     const status = String(order?.status || '').toLowerCase();
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const refundStatus = String(order?.refundStatus || '').toLowerCase();
+    const hasRefundFlow =
+      status === 'cancelled' &&
+      paymentMethod === 'gcash' &&
+      ['pending', 'proof_sent', 'confirmed'].includes(refundStatus);
+
+    if (hasRefundFlow) {
+      if (refundStatus === 'proof_sent') return 'bg-blue-100 text-blue-700';
+      return refundStatus === 'confirmed'
+        ? 'bg-green-100 text-green-800'
+        : 'bg-yellow-100 text-yellow-700';
+    }
+
     if (status === 'completed') return 'bg-gray-100 text-gray-700';
     if (status === 'cancelled') return 'bg-red-100 text-red-700';
     return 'bg-gray-100 text-gray-700';
@@ -260,10 +322,23 @@ const OrderHistory = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{order.paymentMethod?.toUpperCase() || 'CASH'}</td>
                       <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">₱{order.totalAmount?.toFixed(2) || '0.00'}</td>
-                      <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        <span className={`inline-flex px-3 py-1 rounded-full font-semibold ${getHistoryStatusClass(order)}`}>
-                          {getHistoryStatusLabel(order)}
-                        </span>
+                      <td className="px-4 py-3 text-sm">
+                        {String(order?.status || '').toLowerCase() === 'cancelled' &&
+                         String(order?.paymentMethod || '').toLowerCase() === 'gcash' &&
+                         String(order?.refundStatus || '').toLowerCase() === 'proof_sent' &&
+                         order?.refundProofUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRefundOrder(order)}
+                            className={`inline-flex px-3 py-1 rounded-full font-semibold underline hover:opacity-85 ${getHistoryStatusClass(order)}`}
+                          >
+                            {getHistoryStatusLabel(order)}
+                          </button>
+                        ) : (
+                          <span className={`inline-flex px-3 py-1 rounded-full font-semibold ${getHistoryStatusClass(order)}`}>
+                            {getHistoryStatusLabel(order)}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -273,6 +348,53 @@ const OrderHistory = () => {
           </div>
         )}
       </main>
+
+      {selectedRefundOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Refund Proof</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedRefundOrder(null)}
+                className="text-gray-500 hover:text-gray-800 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-5">
+              <p className="text-sm text-gray-600 mb-3">
+                Queue #{selectedRefundOrder.queueNumber || 'N/A'} • Please verify if you received this refund.
+              </p>
+              <img
+                src={toServerAssetUrl(selectedRefundOrder.refundProofUrl)}
+                alt="Refund proof"
+                className="w-full max-h-[420px] object-contain rounded border border-gray-200 bg-gray-50"
+              />
+
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmRefund(selectedRefundOrder._id)}
+                  disabled={!!processingRefundAction}
+                  className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-60"
+                >
+                  {processingRefundAction === 'confirm' ? 'Confirming...' : 'Confirm Received'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNotReceivedRefund(selectedRefundOrder._id)}
+                  disabled={!!processingRefundAction}
+                  className="w-full bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-60"
+                >
+                  {processingRefundAction === 'not_received' ? 'Submitting...' : 'Not Received'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

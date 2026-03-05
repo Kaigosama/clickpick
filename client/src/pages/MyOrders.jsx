@@ -123,12 +123,14 @@ const MyOrders = () => {
   };
 
   const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'preparing': return 'bg-blue-100 text-blue-800';
       case 'ready': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-gray-100 text-gray-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'refund_processing': return 'bg-yellow-100 text-yellow-700';
+      case 'refund_complete': return 'bg-green-100 text-green-800';
       case 'payment_rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -141,13 +143,43 @@ const MyOrders = () => {
   );
 
   const getDisplayStatus = (order) => {
-    if (String(order?.paymentMethod || '').toLowerCase() === 'gcash') {
-      const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+    const status = String(order?.status || '').toLowerCase();
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+    const refundStatus = String(order?.refundStatus || '').toLowerCase();
+
+    if (paymentMethod === 'gcash') {
       if (paymentStatus === 'rejected') return 'PAYMENT REJECTED';
-      if (paymentStatus === 'pending' && String(order?.status || '').toLowerCase() === 'pending') return 'PAYMENT PENDING';
+      if (paymentStatus === 'pending' && status === 'pending') return 'PAYMENT PENDING';
+
+      const hasRefundFlow =
+        status === 'cancelled' && ['pending', 'proof_sent', 'confirmed'].includes(refundStatus);
+      if (hasRefundFlow) {
+        return refundStatus === 'confirmed' ? 'REFUND COMPLETE' : 'REFUND PROCESSING';
+      }
     }
 
-    return order?.status?.toUpperCase() || 'PENDING';
+    return status ? status.toUpperCase() : 'PENDING';
+  };
+
+  const getStatusBadgeTone = (order) => {
+    const status = String(order?.status || '').toLowerCase();
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+    const refundStatus = String(order?.refundStatus || '').toLowerCase();
+
+    if (paymentStatus === 'rejected') return 'payment_rejected';
+
+    const hasRefundFlow =
+      paymentMethod === 'gcash' &&
+      status === 'cancelled' &&
+      ['pending', 'proof_sent', 'confirmed'].includes(refundStatus);
+
+    if (hasRefundFlow) {
+      return refundStatus === 'confirmed' ? 'refund_complete' : 'refund_processing';
+    }
+
+    return status;
   };
 
   const isHistoryOrder = (order) => {
@@ -157,6 +189,12 @@ const MyOrders = () => {
   };
 
   const activeOrders = orders.filter((order) => !isHistoryOrder(order));
+
+  const getStoreName = (order) => {
+    if (order?.storeName) return order.storeName;
+    if (typeof order?.stallId === 'object' && order?.stallId?.name) return order.stallId.name;
+    return 'Store';
+  };
 
   const resolveOrderStallId = (order) => {
     if (typeof order?.stallId === 'string') return order.stallId;
@@ -216,12 +254,6 @@ const MyOrders = () => {
   };
 
   const queueGroups = getQueueGroups();
-
-  const getStoreName = (order) => {
-    if (order?.storeName) return order.storeName;
-    if (typeof order?.stallId === 'object' && order?.stallId?.name) return order.stallId.name;
-    return 'Store';
-  };
 
   const getGraceTimeLeft = (order) => {
     if (order?.status?.toLowerCase() !== 'ready' || !order?.gracePeriodExpiresAt) {
@@ -508,7 +540,7 @@ const MyOrders = () => {
                         {getStoreName(order)} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
-                    <div className={`px-4 py-2 rounded-full font-semibold text-lg ${getStatusColor(String(order?.paymentStatus || '').toLowerCase() === 'rejected' ? 'payment_rejected' : order.status)}`}>
+                    <div className={`px-4 py-2 rounded-full font-semibold text-lg ${getStatusColor(getStatusBadgeTone(order))}`}>
                       {getDisplayStatus(order)}
                     </div>
                   </div>
