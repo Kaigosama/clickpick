@@ -126,6 +126,15 @@ const OrderHistory = () => {
                 <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
                   <button
                     onClick={() => {
+                      navigate('/profile');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    onClick={() => {
                       navigate('/menu');
                       setShowMobileNavMenu(false);
                     }}
@@ -141,15 +150,6 @@ const OrderHistory = () => {
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
                     My Orders
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Profile
                   </button>
                   <button
                     onClick={() => {
