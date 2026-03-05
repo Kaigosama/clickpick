@@ -251,7 +251,7 @@ const MyOrders = () => {
       )}
 
       {/* Header Navigation */}
-      <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
+      <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Brand */}
           <div 
@@ -309,31 +309,34 @@ const MyOrders = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    🏪 Stores
+                    Stores
                   </button>
                   <button
-                    onClick={() => setShowMobileNavMenu(false)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                    onClick={() => {
+                      navigate('/my-orders');
+                      setShowMobileNavMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    📋 My Orders
+                    My Orders
                   </button>
                   <button
                     onClick={() => {
                       navigate('/order-history');
                       setShowMobileNavMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    🧾 Order History
+                    Order History
                   </button>
                   <button
                     onClick={() => {
                       navigate('/profile');
                       setShowMobileNavMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    👤 Edit Profile
+                    Edit Profile
                   </button>
                   <button
                     onClick={() => {
@@ -342,7 +345,7 @@ const MyOrders = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}
@@ -370,7 +373,7 @@ const MyOrders = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    👤 Edit Profile
+                    Edit Profile
                   </button>
                   <button
                     onClick={() => {
@@ -379,7 +382,7 @@ const MyOrders = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}

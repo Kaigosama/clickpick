@@ -113,7 +113,7 @@ const Menu = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    🏪 Stores
+                    Stores
                   </button>
                   <button
                     onClick={() => {
@@ -122,25 +122,25 @@ const Menu = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    📋 My Orders
+                    My Orders
                   </button>
                   <button
                     onClick={() => {
                       navigate('/order-history');
                       setShowMobileNavMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    🕘 Order History
+                    Order History
                   </button>
                   <button
                     onClick={() => {
                       navigate('/profile');
                       setShowMobileNavMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    👤 Edit Profile
+                    Edit Profile
                   </button>
                   <button
                     onClick={() => {
@@ -149,7 +149,7 @@ const Menu = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}
@@ -177,7 +177,7 @@ const Menu = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    👤 Edit Profile
+                    Edit Profile
                   </button>
                   <button
                     onClick={() => {
@@ -186,7 +186,7 @@ const Menu = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}

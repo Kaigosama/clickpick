@@ -637,7 +637,7 @@ const StallMenu = () => {
 
       {/* Header Navigation - staff or customer */}
       {!isStaff ? (
-        <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-40">
+        <header className="bg-[#8B0000] text-white shadow-lg sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-wrap gap-3 items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/menu')}>
               <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -686,25 +686,34 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      🏪 Stores
+                      Stores
                     </button>
                     <button
                       onClick={() => {
                         navigate('/my-orders');
                         setShowCustomerMobileMenu(false);
                       }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold"
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      📋 My Orders
+                      My Orders
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/order-history');
+                        setShowCustomerMobileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      Order History
                     </button>
                     <button
                       onClick={() => {
                         navigate('/profile');
                         setShowCustomerMobileMenu(false);
                       }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-t border-gray-200"
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      👤 Edit Profile
+                      Edit Profile
                     </button>
                     <button
                       onClick={() => {
@@ -713,7 +722,7 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                     >
-                      🚪 Logout
+                      Logout
                     </button>
                   </div>
                 )}
@@ -740,7 +749,7 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      👤 Edit Profile
+                      Edit Profile
                     </button>
                     <button
                       onClick={() => {
@@ -749,7 +758,7 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                     >
-                      🚪 Logout
+                      Logout
                     </button>
                   </div>
                 )}

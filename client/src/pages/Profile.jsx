@@ -197,18 +197,29 @@ const Profile = () => {
                   }}
                   className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                 >
-                  {isStaff ? '🏪 Dashboard' : '🏪 Stores'}
+                  {isStaff ? 'Dashboard' : 'Stores'}
                 </button>
                 {!isStaff && (
-                  <button
-                    onClick={() => {
-                      navigate('/my-orders');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    📋 My Orders
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        navigate('/my-orders');
+                        setShowMobileNavMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      My Orders
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/order-history');
+                        setShowMobileNavMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                    >
+                      Order History
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => {
@@ -217,7 +228,7 @@ const Profile = () => {
                   }}
                   className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                 >
-                  🚪 Logout
+                  Logout
                 </button>
               </div>
             )}
