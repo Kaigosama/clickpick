@@ -7,12 +7,20 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
 
-  const buildKey = (id, variation = '', rice = '') => `${id}::${variation}::${rice}`;
+  const buildKey = (id, variation = '', rice = '', note = '') => {
+    const normalizedNote = String(note || '').trim();
+    return `${id}::${variation}::${rice}::${normalizedNote}`;
+  };
 
   const getCartItemKey = (item) =>
-    buildKey(item?._id, item?.selectedVariation || '', item?.selectedRiceOption || '');
+    buildKey(
+      item?._id,
+      item?.selectedVariation || '',
+      item?.selectedRiceOption || '',
+      item?.noteToStall || ''
+    );
 
-  const parseTarget = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
+  const parseTarget = (itemOrId, selectedVariation = '', selectedRiceOption = '', noteToStall = '') => {
     if (typeof itemOrId === 'object' && itemOrId !== null) {
       return { mode: 'exact', id: itemOrId._id, key: getCartItemKey(itemOrId) };
     }
@@ -21,7 +29,7 @@ export const CartProvider = ({ children }) => {
     const hasOptions = Boolean(selectedVariation || selectedRiceOption);
 
     return hasOptions
-      ? { mode: 'exact', id, key: buildKey(id, selectedVariation, selectedRiceOption) }
+        ? { mode: 'exact', id, key: buildKey(id, selectedVariation, selectedRiceOption, noteToStall) }
       : { mode: 'idOnly', id, key: null };
   };
 
@@ -40,8 +48,8 @@ export const CartProvider = ({ children }) => {
   };
 
   // Remove item from cart
-  const removeFromCart = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
-    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+  const removeFromCart = (itemOrId, selectedVariation = '', selectedRiceOption = '', noteToStall = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption, noteToStall);
 
     setCartItems((prevItems) =>
       prevItems.filter((item) => {
@@ -52,8 +60,8 @@ export const CartProvider = ({ children }) => {
   };
 
   // Decrease quantity or remove if 0
-  const decreaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
-    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+  const decreaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '', noteToStall = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption, noteToStall);
 
     setCartItems((prevItems) => {
       if (target.mode === 'idOnly') {
@@ -74,8 +82,8 @@ export const CartProvider = ({ children }) => {
   };
 
   // Increase quantity
-  const increaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '') => {
-    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption);
+  const increaseQuantity = (itemOrId, selectedVariation = '', selectedRiceOption = '', noteToStall = '') => {
+    const target = parseTarget(itemOrId, selectedVariation, selectedRiceOption, noteToStall);
 
     setCartItems((prevItems) => {
       if (target.mode === 'idOnly') {

@@ -60,11 +60,34 @@ const Cart = () => {
     return toServerAssetUrl(stall.logoUrl);
   };
 
+  const hasConfiguredGcashNumber = (stall) => Boolean(String(stall?.gcashNumber || '').trim());
+
+  const gcashAvailableForCart = Object.keys(groupedByStore).every((storeId) => {
+    const stall = stalls.find((s) => String(s._id) === String(storeId));
+    return hasConfiguredGcashNumber(stall);
+  });
+
+  useEffect(() => {
+    if (!gcashAvailableForCart && paymentMethod === 'gcash') {
+      setPaymentMethod('cash');
+    }
+  }, [gcashAvailableForCart, paymentMethod]);
+
   const getStoreTotal = (storeId) => {
     return groupedByStore[storeId]?.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0) || 0;
   };
 
-  const handleCheckout = async () => {
+  const calculateEstimatedTime = () => {
+    const totalItems = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const baseTime = 5;
+    const timePerItem = 3;
+    const estimated = baseTime + (totalItems * timePerItem);
+    return Math.max(5, Math.min(45, estimated));
+  };
+
+  const estimatedMinutes = calculateEstimatedTime();
+
+  const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
       alert("Cart is empty!");
       return;
@@ -73,6 +96,18 @@ const Cart = () => {
     const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
     if (storeIdsInCart.length > 1) {
       alert('Please place separate orders per store. Your basket currently has items from multiple stores.');
+      return;
+    }
+
+    if (paymentMethod === 'gcash') {
+      if (!gcashAvailableForCart) {
+        alert('GCash is not available for one or more selected stores.');
+        setPaymentMethod('cash');
+        return;
+      }
+
+      const selectedStallId = storeIdsInCart[0];
+      navigate('/gcash-payment', { state: { stallId: selectedStallId } });
       return;
     }
 
@@ -85,6 +120,7 @@ const Cart = () => {
           name: item.name,
           variation: item.selectedVariation || '',
           riceOption: item.selectedRiceOption || '',
+          noteToStall: String(item.noteToStall || '').trim(),
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -114,51 +150,106 @@ const Cart = () => {
     });
   };
 
-  const handleProceedToCheckout = () => {
-    if (hasMultipleStores) {
-      alert('Please place separate orders per store. Your basket currently has items from multiple stores.');
-      return;
-    }
-    navigate('/checkout');
-  };
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <CustomerHeader />
+      <CustomerHeader activePage="stores" />
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-100px)]">
         {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/menu')}
-              className="text-2xl font-bold text-[#8B0000] hover:opacity-80 transition-opacity hover:scale-110"
-            >
-              ← Back
-            </button>
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">My Basket</h1>
-          </div>
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 border-b-4 border-[#8B0000]">
+          <button
+            onClick={() => navigate('/menu')}
+            className="mb-4 px-4 py-2 text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            ← Back to Stalls
+          </button>
+
+          <h1 className="text-3xl font-bold text-gray-900">My Cart</h1>
         </div>
 
         {cartItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-xl p-16 text-center border-4 border-dashed border-[#8B0000]">
             <div className="text-7xl mb-6">🛒</div>
             <h2 className="text-3xl font-bold text-gray-900 mb-3">Your Basket is Empty</h2>
-            <p className="text-gray-500 mb-8 text-lg">Add items from a store to get started</p>
+            <p className="text-gray-500 mb-8 text-lg">Add items from a stall to get started</p>
             <button
               onClick={() => navigate('/menu')}
               className="bg-[#8B0000] text-white font-semibold py-4 px-8 rounded-lg hover:bg-red-800 transition-all text-lg shadow-md hover:shadow-lg"
             >
-              🏪 Browse Stores
+              Browse Stalls
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Basket Items */}
-            <div className="lg:col-span-2 space-y-6">
+            {/* Payment Details */}
+            <div className="order-2 lg:order-2 lg:col-span-1">
+              <div className="sticky top-24">
+                <div className="bg-white rounded-lg shadow-lg p-6 space-y-4">
+                  <h3 className="text-xl font-bold text-gray-900">Payment Details</h3>
+
+                  {/* Payment Method */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-900">Mode of Payment</label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full border-2 border-gray-300 rounded-lg py-2 px-3 font-semibold text-gray-900 focus:outline-none focus:border-[#8B0000]"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="gcash" disabled={!gcashAvailableForCart}>GCash{!gcashAvailableForCart ? ' (Unavailable)' : ''}</option>
+                    </select>
+                  </div>
+
+                  {/* Estimated Time */}
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-gray-600">Estimated Time</p>
+                    <p className="text-lg font-bold text-amber-700">{estimatedMinutes} minutes</p>
+                  </div>
+
+                  {/* Total */}
+                  <div className="bg-[#8B0000] text-white rounded-lg p-4 text-center">
+                    <p className="text-sm font-semibold mb-1">TOTAL</p>
+                    <p className="text-3xl font-bold">₱{cartTotal.toFixed(2)}</p>
+                  </div>
+
+                  {/* Place Order Button */}
+                  {hasMultipleStores && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                      <p className="text-xs font-semibold text-amber-800">
+                        Please place separate orders per store before placing an order.
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handlePlaceOrder}
+                    disabled={cartItems.length === 0 || loading}
+                    className={`w-full py-3 font-bold rounded-lg transition-colors ${
+                      cartItems.length === 0 || loading
+                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        : 'bg-[#8B0000] text-white hover:bg-red-800'
+                    }`}
+                  >
+                    {loading ? 'Placing Order...' : 'Place Order'}
+                  </button>
+
+                  {/* Continue Shopping */}
+                  <button
+                    onClick={() => navigate('/menu')}
+                    className="w-full py-2 bg-gray-200 text-gray-900 font-bold rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  >
+                    Continue Shopping
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div className="order-1 lg:order-1 lg:col-span-2 space-y-6">
+              <h3 className="text-2xl font-bold text-gray-900">Order Summary</h3>
               {Object.entries(groupedByStore).map(([storeId, items]) => {
                 const stall = resolveStall(storeId);
                 const stallLogo = resolveStallLogo(stall);
@@ -189,6 +280,9 @@ const Cart = () => {
                             )}
                             {item.riceOptionLabel && (
                               <p className="text-xs text-gray-600 mt-1">Rice: {item.riceOptionLabel}</p>
+                            )}
+                            {String(item.noteToStall || '').trim() && (
+                              <p className="text-xs text-gray-600 mt-1">Note: {String(item.noteToStall).trim()}</p>
                             )}
                             <div className="flex items-center gap-2 mt-2">
                               <button
@@ -236,53 +330,6 @@ const Cart = () => {
               })}
             </div>
 
-            {/* Summary Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-lg p-6 sticky top-24 space-y-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-
-                {/* Subtotal */}
-                <div className="flex justify-between text-gray-900">
-                  <span className="text-sm font-semibold">Subtotal:</span>
-                  <span className="text-sm">₱{cartTotal.toFixed(2)}</span>
-                </div>
-
-                {/* Total */}
-                <div className="bg-[#8B0000] text-white rounded-lg p-4 text-center">
-                  <p className="text-sm font-semibold mb-1">TOTAL</p>
-                  <p className="text-3xl font-bold">₱{cartTotal.toFixed(2)}</p>
-                </div>
-
-                {/* Checkout Button */}
-                {hasMultipleStores && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-                    <p className="text-xs font-semibold text-amber-800">
-                      Please place separate orders per store before checkout.
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleProceedToCheckout}
-                  disabled={cartItems.length === 0}
-                  className={`w-full py-3 font-bold rounded-lg transition-colors ${
-                    cartItems.length === 0
-                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                      : 'bg-[#8B0000] text-white hover:bg-red-800'
-                  }`}
-                >
-                  Checkout
-                </button>
-
-                {/* Continue Shopping */}
-                <button
-                  onClick={() => navigate('/menu')}
-                  className="w-full py-2 bg-gray-200 text-gray-900 font-bold rounded-lg hover:bg-gray-300 transition-colors text-sm"
-                >
-                  Continue Shopping
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </main>

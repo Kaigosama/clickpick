@@ -1750,7 +1750,7 @@ const StallMenu = () => {
             onMouseEnter={() => setShowCartPreview(true)}
             onMouseLeave={() => setShowCartPreview(false)}
             className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold transition-all shadow-lg ${isStoreClosedForCustomer ? 'bg-gray-400 text-gray-100 cursor-not-allowed' : 'bg-[#8B0000] text-white hover:bg-red-800 hover:shadow-xl'}`}
-            title="View Basket"
+            title="View Cart"
           >
             🛒
             {cartItems.length > 0 && (

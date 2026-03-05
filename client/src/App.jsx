@@ -9,7 +9,6 @@ import MyOrders from './pages/MyOrders';
 import OrderHistory from './pages/OrderHistory';
 import Profile from './pages/Profile';
 import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
 import GCashPayment from './pages/GCashPayment';
 import PaymentWaiting from './pages/PaymentWaiting';
 
@@ -154,14 +153,6 @@ function App() {
               element={
                 <PrivateRoute role="customer">
                   <Cart />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/checkout" 
-              element={
-                <PrivateRoute role="customer">
-                  <Checkout />
                 </PrivateRoute>
               } 
             />

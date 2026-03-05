@@ -22,11 +22,11 @@ const CartPreview = ({ cartItems, cartTotal, onCheckoutClick }) => {
       style={{ width: 'min(20rem, calc(100vw - 1rem))' }}
     >
       <div className="p-4 bg-[#8B0000] text-white flex items-center justify-between">
-        <h2 className="text-xl font-bold">🛒 My Basket</h2>
+        <h2 className="text-xl font-bold">🛒 My Cart</h2>
       </div>
       
       {cartItems.length === 0 ? (
-        <p className="text-gray-600 text-center py-12">Basket is empty</p>
+        <p className="text-gray-600 text-center py-12">Cart is empty</p>
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Items List */}
@@ -58,7 +58,7 @@ const CartPreview = ({ cartItems, cartTotal, onCheckoutClick }) => {
               onClick={onCheckoutClick}
               className="w-full bg-[#8B0000] text-white font-bold py-2 rounded-lg hover:bg-red-800 transition-colors text-sm"
             >
-              View Full Basket
+              View Full Cart
             </button>
           </div>
         </div>

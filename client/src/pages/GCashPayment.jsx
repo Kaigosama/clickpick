@@ -83,7 +83,7 @@ const GCashPayment = () => {
     const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
     if (storeIdsInCart.length > 1) {
       alert('Please place separate orders per store. Your cart currently has items from multiple stores.');
-      navigate('/checkout');
+      navigate('/cart');
       return;
     }
 
@@ -103,6 +103,7 @@ const GCashPayment = () => {
         name: item.name,
         variation: item.selectedVariation || '',
         riceOption: item.selectedRiceOption || '',
+        noteToStall: String(item.noteToStall || '').trim(),
         quantity: item.quantity || 1,
         price: item.price
       }));
@@ -142,7 +143,7 @@ const GCashPayment = () => {
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-8 border-b-4 border-[#8B0000]">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/checkout')}
+              onClick={() => navigate('/cart')}
               className="text-2xl font-bold text-[#8B0000] hover:opacity-80 transition-opacity hover:scale-110"
             >
               ← Back
@@ -187,10 +188,10 @@ const GCashPayment = () => {
               <p className="text-lg font-bold text-red-600">Time limit exceeded!</p>
               <p className="text-gray-700 mt-2">Please go back and try again.</p>
               <button
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate('/cart')}
                 className="mt-4 px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
               >
-                Back to Checkout
+                Back to Cart
               </button>
             </div>
           ) : (
@@ -232,7 +233,7 @@ const GCashPayment = () => {
 
         <div className="mt-6">
           <button
-            onClick={() => navigate('/checkout')}
+            onClick={() => navigate('/cart')}
             className="w-full py-2 bg-gray-200 text-gray-900 font-bold rounded-lg hover:bg-gray-300 transition-colors"
           >
             Cancel

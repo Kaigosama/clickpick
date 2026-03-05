@@ -8,6 +8,7 @@ const OrderSchema = new mongoose.Schema({
       name: { type: String },
       variation: { type: String, default: '' },
       riceOption: { type: String, enum: ['no_rice', 'with_rice', ''], default: '' },
+      noteToStall: { type: String, default: '' },
       quantity: { type: Number, required: true },
       price: { type: Number, required: true }
     }

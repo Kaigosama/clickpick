@@ -3,6 +3,7 @@ import { toServerAssetUrl } from '../services/assetUrl.js';
 
 const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
+  const [noteToStall, setNoteToStall] = useState('');
   const parsedVariationOptions = Array.isArray(item.variationOptions) && item.variationOptions.length > 0
     ? item.variationOptions
         .map((option) => ({
@@ -51,6 +52,7 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
         ...item,
         selectedVariation,
         selectedRiceOption,
+        noteToStall: String(noteToStall || '').trim(),
         riceOptionLabel: selectedRiceOption === 'with_rice' ? 'With Rice' : selectedRiceOption === 'no_rice' ? 'No Rice' : '',
         price: effectivePrice,
         stallId: stallId || stall?.id || 1
@@ -83,16 +85,6 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
     }
   };
 
-  // Calculate estimated time based on quantity (approximate)
-  // Actual time will be calculated by backend based on queue
-  const estimateTime = () => {
-    const baseTime = 5;
-    const timePerItem = 3;
-    return baseTime + (quantity * timePerItem);
-  };
-  
-  const estimatedTime = estimateTime();
-  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
@@ -179,6 +171,18 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
             </div>
           )}
 
+          <div className="mb-6 sm:mb-8">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">NOTE TO STALL (OPTIONAL)</label>
+            <textarea
+              value={noteToStall}
+              onChange={(e) => setNoteToStall(e.target.value)}
+              maxLength={150}
+              rows={3}
+              placeholder="Add special instructions..."
+              className="w-full border-2 border-gray-300 rounded py-2 px-3 text-sm text-gray-900 focus:outline-none focus:border-[#8B0000]"
+            />
+          </div>
+
           {/* Quantity Selector */}
           <div className="mb-6 sm:mb-8">
             <label className="block text-sm font-semibold text-gray-700 mb-3">QUANTITY</label>
@@ -219,10 +223,6 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
             <div className="flex items-center justify-between">
               <span className="font-semibold text-gray-900">TOTAL</span>
               <span className="text-xl sm:text-2xl font-bold text-gray-900">₱{(effectivePrice * quantity).toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-gray-900">ESTIMATED TIME</span>
-              <span className="text-gray-900">{estimatedTime} MINUTES</span>
             </div>
           </div>
 

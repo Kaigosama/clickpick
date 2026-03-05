@@ -126,10 +126,10 @@ const PaymentWaiting = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate('/cart')}
                 className="px-6 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition-colors"
               >
-                Back to Checkout
+                Back to Cart
               </button>
               <button
                 onClick={() => navigate('/my-orders')}

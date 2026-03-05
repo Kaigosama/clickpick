@@ -137,7 +137,7 @@ const Menu = () => {
           onMouseEnter={() => setShowCartPreview(true)}
           onMouseLeave={() => setShowCartPreview(false)}
           className="bg-[#8B0000] text-white w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold hover:bg-red-800 transition-all shadow-lg hover:shadow-xl"
-          title="View Basket"
+          title="View Cart"
         >
           🛒
           {cartItems.length > 0 && (
