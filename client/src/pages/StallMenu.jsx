@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import api from '../services/api.js';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
@@ -13,6 +13,7 @@ import { jsPDF } from 'jspdf';
 
 const StallMenu = () => {
   const { stallId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, updateUser } = useContext(AuthContext);
   const { cartItems, addToCart, removeFromCart, cartTotal, clearCart } = useCart();
@@ -26,7 +27,7 @@ const StallMenu = () => {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [activeTab, setActiveTab] = useState('products');
   const [orders, setOrders] = useState([]);
-  const [showQueueFlow, setShowQueueFlow] = useState(true);
+  const [showQueueFlow, setShowQueueFlow] = useState(false);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [showCustomerMobileMenu, setShowCustomerMobileMenu] = useState(false);
@@ -56,6 +57,7 @@ const StallMenu = () => {
     logo: 'ST'
   };
   const isStaff = user?.role === 'stall_staff';
+  const isStoreProfilePage = location.pathname === '/profile';
 
   useEffect(() => {
     setGcashNumber(user?.gcashNumber || '');
@@ -637,6 +639,9 @@ const StallMenu = () => {
     return [...preferred, ...others];
   })();
 
+  const queueStats = getQueueStats();
+  const hasActiveOrders = queueStats.total > 0;
+
   if (!stall) {
     return <div className="text-center py-12">Stall not found</div>;
   }
@@ -786,7 +791,7 @@ const StallMenu = () => {
           </div>
         </header>
       ) : (
-        <header className="bg-[#8B0000] text-white shadow sticky top-0 z-40">
+        <header className="bg-[#8B0000] text-white shadow sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img src="/logo.png" alt="ClickPick" className="w-12 h-12 object-contain" />
@@ -843,51 +848,61 @@ const StallMenu = () => {
 
                 {showStaffMobileMenu && (
                   <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-52 overflow-hidden">
-                    <button
-                      onClick={() => {
-                        setActiveTab('products');
-                        setShowStaffMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Products
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('orders');
-                        setShowStaffMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      📋 Orders
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('sales');
-                        setShowStaffMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      💰 Sales
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('settings');
-                        setShowStaffMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      ⚙️ Settings
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setShowStaffMobileMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                    >
-                      Store Profile
-                    </button>
+                    {!isStoreProfilePage && (
+                      <button
+                        onClick={() => {
+                          navigate('/profile');
+                          setShowStaffMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                      >
+                        Store Profile
+                      </button>
+                    )}
+                    {activeTab !== 'products' && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('products');
+                          setShowStaffMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                      >
+                        Products
+                      </button>
+                    )}
+                    {activeTab !== 'orders' && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('orders');
+                          setShowStaffMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                      >
+                        Orders
+                      </button>
+                    )}
+                    {activeTab !== 'sales' && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('sales');
+                          setShowStaffMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                      >
+                        Sales
+                      </button>
+                    )}
+                    {activeTab !== 'settings' && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('settings');
+                          setShowStaffMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
+                      >
+                        Settings
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowStaffMobileMenu(false);
@@ -1075,36 +1090,38 @@ const StallMenu = () => {
             <div className="bg-gradient-to-br from-[#c41e3a] to-[#8B0000] rounded-lg shadow-lg p-8 text-white">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-3xl font-bold">📋 Live Orders Queue</h2>
-              <button
-                onClick={() => setShowQueueFlow(!showQueueFlow)}
-                className="bg-white text-[#8B0000] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm"
-              >
-                {showQueueFlow ? '📊 List View' : '🔄 Queue Flow'}
-              </button>
+              {hasActiveOrders && (
+                <button
+                  onClick={() => setShowQueueFlow(!showQueueFlow)}
+                  className="bg-white text-[#8B0000] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm"
+                >
+                  {showQueueFlow ? '📊 List View' : '🔄 Queue Flow'}
+                </button>
+              )}
             </div>
 
             {/* Queue Statistics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
               <div className="bg-yellow-400 bg-opacity-20 p-4 rounded-lg border-2 border-yellow-400">
                 <p className="text-yellow-200 text-sm font-semibold mb-1">⏳ Pending</p>
-                <p className="text-3xl font-bold">{getQueueStats().pending}</p>
+                <p className="text-3xl font-bold">{queueStats.pending}</p>
               </div>
               <div className="bg-orange-400 bg-opacity-20 p-4 rounded-lg border-2 border-orange-400">
                 <p className="text-orange-200 text-sm font-semibold mb-1">👨‍🍳 Preparing</p>
-                <p className="text-3xl font-bold">{getQueueStats().preparing}</p>
+                <p className="text-3xl font-bold">{queueStats.preparing}</p>
               </div>
               <div className="bg-green-400 bg-opacity-20 p-4 rounded-lg border-2 border-green-400">
                 <p className="text-green-200 text-sm font-semibold mb-1">✅ Ready</p>
-                <p className="text-3xl font-bold">{getQueueStats().ready}</p>
+                <p className="text-3xl font-bold">{queueStats.ready}</p>
               </div>
               <div className="bg-white bg-opacity-10 p-4 rounded-lg border-2 border-white border-opacity-30">
                 <p className="text-gray-200 text-sm font-semibold mb-1">📈 Total</p>
-                <p className="text-3xl font-bold">{getQueueStats().total}</p>
+                <p className="text-3xl font-bold">{queueStats.total}</p>
               </div>
             </div>
 
             {/* Queue Flow Visualization */}
-            {showQueueFlow && getQueueStats().total > 0 && (
+            {showQueueFlow && hasActiveOrders && (
               <div className="bg-white bg-opacity-10 p-6 rounded-lg mb-8 overflow-x-auto">
                 <div className="flex items-center gap-2 min-w-max pb-2">
                   {getPendingOrders().map((order, idx) => (
@@ -1145,7 +1162,7 @@ const StallMenu = () => {
             )}
 
             {/* Orders by Status - List View */}
-            {!showQueueFlow && (
+            {(!showQueueFlow || !hasActiveOrders) && (
               <div className="space-y-8">
                 {/* Pending Orders */}
                 {getPendingOrders().length > 0 && (
@@ -1332,18 +1349,11 @@ const StallMenu = () => {
                   </div>
                 )}
 
-                {getQueueStats().total === 0 && (
+                {!hasActiveOrders && (
                   <div className="text-center py-12">
                     <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Empty State */}
-            {getQueueStats().total === 0 && showQueueFlow && (
-              <div className="text-center py-12">
-                <p className="text-xl opacity-70">✨ No orders in queue - You're all caught up!</p>
               </div>
             )}
           </div>
@@ -1409,15 +1419,8 @@ const StallMenu = () => {
           </>
         ) : isStaff && activeTab === 'sales' ? (
           <div className="bg-white rounded-lg shadow border border-gray-200 p-6 md:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={() => setActiveTab('orders')}
-                className="text-sm font-semibold text-gray-600 hover:text-gray-900"
-              >
-                ← Back
-              </button>
+            <div className="flex items-center justify-center mb-6">
               <h2 className="text-3xl md:text-4xl font-black tracking-wide text-gray-900">SALES</h2>
-              <div className="w-16" />
             </div>
 
             <div className="border border-gray-200 rounded-lg overflow-hidden">
