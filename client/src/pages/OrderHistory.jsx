@@ -155,7 +155,7 @@ const OrderHistory = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    Edit Profile
+                    Profile
                   </button>
                   <button
                     onClick={() => {
@@ -191,7 +191,7 @@ const OrderHistory = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                   >
-                    Edit Profile
+                    Profile
                   </button>
                   <button
                     onClick={() => {

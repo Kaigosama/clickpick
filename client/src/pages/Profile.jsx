@@ -25,6 +25,7 @@ const Profile = () => {
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [showMobileNavMenu, setShowMobileNavMenu] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -95,14 +96,14 @@ const Profile = () => {
       if (response.data.user) {
         updateUser(response.data.user);
         setMessage('Profile updated successfully!');
-        setTimeout(() => {
-          if (isStaff) {
+        if (!isStaff) {
+          setIsEditing(false);
+        } else {
+          setTimeout(() => {
             const stallId = user.stallId || user._id;
             navigate(`/stall/${stallId}`);
-          } else {
-            navigate('/menu');
-          }
-        }, 1500);
+          }, 1500);
+        }
       }
     } catch (err) {
       setMessage('Error updating profile: ' + (err.response?.data?.message || err.message));
@@ -257,7 +258,7 @@ const Profile = () => {
             {isStaff ? 'Edit Store Profile' : 'My Profile'}
           </h1>
           <p className="text-gray-600 mb-8">
-            {isStaff ? 'Update your store details' : 'Edit your account details'}
+            {isStaff ? 'Update your store details' : (isEditing ? 'Edit your account details' : 'Your account information')}
           </p>
 
           {message && (
@@ -266,6 +267,49 @@ const Profile = () => {
             </div>
           )}
 
+          {/* Customer view mode */}
+          {!isStaff && !isEditing ? (
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</p>
+                <p className="text-lg font-medium text-gray-900">{user.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</p>
+                <p className="text-lg font-medium text-gray-900">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Phone Number</p>
+                <p className="text-lg font-medium text-gray-900">{user.phone || <span className="text-gray-400">Not set</span>}</p>
+              </div>
+              <div className="pt-4">
+                <button
+                  onClick={() => { setIsEditing(true); setMessage(''); }}
+                  className="w-full bg-[#8B0000] text-white font-bold py-3 rounded-lg hover:bg-red-800 transition-colors"
+                >
+                  Edit Profile
+                </button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => { setShowChangePassword(true); setPwError(''); setPwSuccess(''); }}
+                  className="w-full border-2 border-[#8B0000] text-[#8B0000] font-bold py-2 rounded-lg hover:bg-[#8B0000] hover:text-white transition-colors"
+                >
+                  Change Password
+                </button>
+              </div>
+              <div className="pt-6 border-t-2 border-gray-200">
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          ) : (
+          <>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Store/Full Name */}
             <div>
@@ -403,7 +447,8 @@ const Profile = () => {
                     const stallId = user?.stallId || user?._id;
                     navigate(`/stall/${stallId}`);
                   } else {
-                    navigate('/menu');
+                    setIsEditing(false);
+                    setMessage('');
                   }
                 }}
                 className="flex-1 bg-gray-300 text-gray-900 font-bold py-3 rounded-lg hover:bg-gray-400 transition-colors"
@@ -413,15 +458,18 @@ const Profile = () => {
             </div>
           </form>
 
-          {/* Logout Button */}
-          <div className="mt-12 pt-8 border-t-2 border-gray-200">
-            <button
-              onClick={handleLogout}
-              className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+          {isStaff && (
+            <div className="mt-12 pt-8 border-t-2 border-gray-200">
+              <button
+                onClick={handleLogout}
+                className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          </>
+          )}
         </div>
       </main>
 
