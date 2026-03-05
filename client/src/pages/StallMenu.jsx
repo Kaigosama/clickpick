@@ -40,20 +40,20 @@ const StallMenu = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
   const defaultStalls = [
-    { id: 'default-1', name: 'Store 1', logo: '🍔' },
-    { id: 'default-2', name: 'Store 2', logo: '🍜' },
-    { id: 'default-3', name: 'Store 3', logo: '🍕' },
-    { id: 'default-4', name: 'Store 4', logo: '🍱' },
-    { id: 'default-5', name: 'Store 5', logo: '🍲' },
-    { id: 'default-6', name: 'Store 6', logo: '🥘' },
-    { id: 'default-7', name: 'Store 7', logo: '🍛' },
-    { id: 'default-8', name: 'Store 8', logo: '🥙' },
+    { id: 'default-1', name: 'Store 1', logo: 'S1' },
+    { id: 'default-2', name: 'Store 2', logo: 'S2' },
+    { id: 'default-3', name: 'Store 3', logo: 'S3' },
+    { id: 'default-4', name: 'Store 4', logo: 'S4' },
+    { id: 'default-5', name: 'Store 5', logo: 'S5' },
+    { id: 'default-6', name: 'Store 6', logo: 'S6' },
+    { id: 'default-7', name: 'Store 7', logo: 'S7' },
+    { id: 'default-8', name: 'Store 8', logo: 'S8' },
   ];
   const [stalls, setStalls] = useState(defaultStalls);
 
   const stall = stalls.find((entry) => entry.id === stallId) || {
     name: 'Store',
-    logo: '🍽️'
+    logo: 'ST'
   };
   const isStaff = user?.role === 'stall_staff';
 
@@ -823,9 +823,6 @@ const StallMenu = () => {
             </nav>
 
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex flex-col text-right mr-2">
-                <span className="font-semibold text-sm uppercase">{(user?.name || 'DELA CRUZ, JUAN A.').toUpperCase()}</span>
-              </div>
 
               <div className="sm:hidden relative">
                 <div className="flex items-center gap-2">
@@ -853,7 +850,7 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      📦 Products
+                      Products
                     </button>
                     <button
                       onClick={() => {
@@ -884,12 +881,12 @@ const StallMenu = () => {
                     </button>
                     <button
                       onClick={() => {
-                        navigate('/store-profile');
+                        navigate('/profile');
                         setShowStaffMobileMenu(false);
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      🏪 Edit Store Profile
+                      Store Profile
                     </button>
                     <button
                       onClick={() => {
@@ -898,30 +895,34 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                     >
-                      🚪 Logout
+                      Logout
                     </button>
                   </div>
                 )}
               </div>
 
-              <div className="relative">
+              <div className="relative hidden sm:block">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="hidden sm:flex w-10 h-10 bg-white rounded-full items-center justify-center text-[#8B0000] font-bold"
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                  aria-label="Toggle profile menu"
                 >
-                  {user?.name?.charAt(0) || 'D'}
+                  <div className="flex items-center gap-1">
+                    <p className="font-semibold text-sm uppercase">{user?.name || 'Staff'}</p>
+                    <p className="text-xs">{showProfileMenu ? '▲' : '▼'}</p>
+                  </div>
                 </button>
 
                 {showProfileMenu && (
                   <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-40">
                     <button
                       onClick={() => {
-                        navigate('/store-profile');
+                        navigate('/profile');
                         setShowProfileMenu(false);
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
                     >
-                      🏪 Edit Store Profile
+                      Store Profile
                     </button>
                     <button
                       onClick={() => {
@@ -930,7 +931,7 @@ const StallMenu = () => {
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                     >
-                      🚪 Logout
+                      Logout
                     </button>
                   </div>
                 )}
@@ -1579,7 +1580,7 @@ const StallMenu = () => {
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
-                                      <span>🍽️</span>
+                                      <span className="text-sm font-semibold uppercase">Img</span>
                                     )}
                                   </div>
                                     <div className="w-full min-w-0">
@@ -1648,7 +1649,7 @@ const StallMenu = () => {
                                       className="w-full h-full object-contain"
                                     />
                                   ) : (
-                                    <span>🍽️</span>
+                                    <span className="text-sm font-semibold uppercase">Img</span>
                                   )}
                                 </div>
                                 

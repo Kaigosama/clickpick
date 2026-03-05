@@ -112,7 +112,8 @@ const Auth = () => {
 
         // 4. Redirect based on Role
         if (res.data.user.role === 'stall_staff') {
-          navigate('/kitchen');
+          const stallId = res.data.user.stallId || res.data.user._id;
+          navigate(`/stall/${stallId}`);
         } else {
           navigate('/menu');
         }

@@ -245,7 +245,7 @@ const AddItemModal = ({ stallId, onClose, onSave }) => {
                 {formData.imagePreview ? (
                   <img src={formData.imagePreview} alt="preview" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-white text-3xl">🍽️</span>
+                  <span className="text-white text-sm font-semibold uppercase">Img</span>
                 )}
               </div>
               <div className="flex flex-col justify-center">

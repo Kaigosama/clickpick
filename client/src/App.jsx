@@ -7,7 +7,6 @@ import Menu from './pages/Menu';
 import StallMenu from './pages/StallMenu';
 import MyOrders from './pages/MyOrders';
 import OrderHistory from './pages/OrderHistory';
-import Kitchen from './pages/Kitchen';
 import Profile from './pages/Profile';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -17,18 +16,6 @@ import PaymentWaiting from './pages/PaymentWaiting';
 // Root route should always show auth page first
 const AuthOrDashboard = () => {
   return <Auth />;
-};
-
-const ProfileRedirect = () => {
-  const { user, loading } = useContext(AuthContext);
-
-  if (loading) return null;
-
-  if (user?.role === 'stall_staff') {
-    return <Navigate to="/store-profile" replace />;
-  }
-
-  return <Profile />;
 };
 
 const TitleManager = () => {
@@ -63,13 +50,15 @@ const PrivateRoute = ({ children, role }) => {
 
   if (!token || !user) return <Navigate to="/" replace />;
 
+  const staffHomePath = `/stall/${user.stallId || user._id}`;
+
   if (role) {
     // allow role to be string or array of strings
     if (Array.isArray(role)) {
       if (!role.includes(user.role)) {
         // Redirect to appropriate dashboard based on user's actual role
         if (user.role === 'stall_staff') {
-          return <Navigate to="/kitchen" replace />;
+          return <Navigate to={staffHomePath} replace />;
         } else if (user.role === 'customer') {
           return <Navigate to="/menu" replace />;
         }
@@ -79,7 +68,7 @@ const PrivateRoute = ({ children, role }) => {
       if (user.role !== role) {
         // Redirect to appropriate dashboard based on user's actual role
         if (user.role === 'stall_staff') {
-          return <Navigate to="/kitchen" replace />;
+          return <Navigate to={staffHomePath} replace />;
         } else if (user.role === 'customer') {
           return <Navigate to="/menu" replace />;
         }
@@ -140,7 +129,7 @@ function App() {
               path="/profile" 
               element={
                 <PrivateRoute role={["customer", "stall_staff"]}>
-                  <ProfileRedirect />
+                  <Profile />
                 </PrivateRoute>
               } 
             />
@@ -148,7 +137,7 @@ function App() {
               path="/store-profile" 
               element={
                 <PrivateRoute role="stall_staff">
-                  <Profile />
+                  <Navigate to="/profile" replace />
                 </PrivateRoute>
               } 
             />
@@ -192,17 +181,6 @@ function App() {
                 </PrivateRoute>
               } 
             />
-
-            {/* Staff Routes - Only accessible by canteen staff */}
-            <Route 
-              path="/kitchen" 
-              element={
-                <PrivateRoute role="stall_staff">
-                  <Kitchen />
-                </PrivateRoute>
-              } 
-            />
-
             {/* Catch-all route - redirect to appropriate page */}
             <Route path="*" element={<AuthOrDashboard />} />
           </Routes>

@@ -218,7 +218,7 @@ const Cart = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}
@@ -254,7 +254,7 @@ const Cart = () => {
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-red-100 transition-colors font-semibold text-red-600"
                   >
-                    🚪 Logout
+                    Logout
                   </button>
                 </div>
               )}
