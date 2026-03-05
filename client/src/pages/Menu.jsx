@@ -85,7 +85,7 @@ const Menu = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">Available Canteen Stalls</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">Canteen Stalls</h1>
         <p className="text-gray-600 mb-8">Select a stall to view their menu items</p>
 
         {/* Stalls Grid */}
@@ -99,8 +99,7 @@ const Menu = () => {
               <button
                 key={stall.id}
                 onClick={() => handleStallClick(stall.id)}
-                className={`bg-white rounded-lg shadow-md sm:shadow-lg transition-shadow p-3 sm:p-6 flex flex-col items-center justify-center text-center border-2 ${stall.storeOpen ? 'border-gray-200 hover:border-[#8B0000] hover:shadow-xl cursor-pointer' : 'border-gray-300 opacity-75 cursor-not-allowed'}`}
-                disabled={!stall.storeOpen}
+                className={`bg-white rounded-lg shadow-md sm:shadow-lg transition-shadow p-3 sm:p-6 flex flex-col items-center justify-center text-center border-2 ${stall.storeOpen ? 'border-gray-200 hover:border-[#8B0000] hover:shadow-xl cursor-pointer' : 'border-gray-300 opacity-85 hover:border-gray-400 cursor-pointer'}`}
               >
                 {/* Logo/Icon */}
                 <div className="w-14 h-14 sm:w-24 sm:h-24 bg-[#8B0000] rounded flex items-center justify-center mb-2 sm:mb-4 text-2xl sm:text-5xl overflow-hidden">
@@ -122,6 +121,9 @@ const Menu = () => {
                 <p className={`mt-1 text-xs sm:text-sm font-semibold ${stall.storeOpen ? 'text-green-600' : 'text-red-600'}`}>
                   {stall.storeOpen ? 'Open' : 'Closed'}
                 </p>
+                {!stall.storeOpen && (
+                  <p className="mt-1 text-[11px] sm:text-xs text-gray-500">Menu view only</p>
+                )}
               </button>
             ))
           )}

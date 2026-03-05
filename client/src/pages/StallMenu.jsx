@@ -1487,7 +1487,6 @@ const StallMenu = () => {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">{stall.name}</h1>
-                  <p className="text-gray-600 mt-1">Menu Items</p>
                   {!isStaff && (
                     <p className={`text-sm font-semibold mt-1 ${isStoreClosedForCustomer ? 'text-red-600' : 'text-green-600'}`}>
                       {isStoreClosedForCustomer ? 'Store is currently closed' : 'Store is open'}
@@ -1613,11 +1612,9 @@ const StallMenu = () => {
                               <div 
                                 key={item._id}
                                 onClick={() => {
-                                  if (!isStoreClosedForCustomer) {
-                                    setSelectedProduct(item);
-                                  }
+                                  setSelectedProduct(item);
                                 }}
-                                className={`bg-white rounded-lg border-2 sm:border-4 border-gray-300 shadow transition-all overflow-hidden flex flex-col self-start ${isStoreClosedForCustomer ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-lg hover:border-[#8B0000]'}`}
+                                className={`bg-white rounded-lg border-2 sm:border-4 border-gray-300 shadow transition-all overflow-hidden flex flex-col self-start ${isStoreClosedForCustomer ? 'cursor-pointer opacity-90 hover:shadow-md' : 'cursor-pointer hover:shadow-lg hover:border-[#8B0000]'}`}
                               >
                                 <div className="p-2 sm:p-6 flex flex-col items-center gap-2 sm:gap-3 w-full">
                                   <div className="w-full aspect-square max-w-[110px] sm:max-w-none bg-gray-100 rounded-md flex items-center justify-center overflow-hidden">

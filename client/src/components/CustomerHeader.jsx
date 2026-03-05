@@ -9,7 +9,7 @@ const CustomerHeader = ({ activePage = '' }) => {
   const [showMobileProfileMenu, setShowMobileProfileMenu] = useState(false);
 
   const navItems = useMemo(() => ([
-    { key: 'stores', label: 'STORES', path: '/menu' },
+    { key: 'stores', label: 'STALLS', path: '/menu' },
     { key: 'my-orders', label: 'MY ORDERS', path: '/my-orders' },
     { key: 'order-history', label: 'ORDER HISTORY', path: '/order-history' }
   ]), []);
