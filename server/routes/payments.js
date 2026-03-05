@@ -97,6 +97,20 @@ const toImageDataUrl = (file) => {
   return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 };
 
+const normalizeOrderItems = (items = [], sharedNote = '') => {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    menuItemId: item?.menuItemId || item?._id,
+    name: String(item?.name || '').trim(),
+    variation: String(item?.variation || '').trim(),
+    riceOption: ['no_rice', 'with_rice'].includes(String(item?.riceOption || '').trim())
+      ? String(item?.riceOption || '').trim()
+      : '',
+    noteToStall: String(item?.noteToStall || item?.note || item?.customerNote || sharedNote || '').trim(),
+    quantity: Number(item?.quantity || 1),
+    price: Number(item?.price || 0)
+  }));
+};
+
 // Upload GCash proof of payment
 router.post('/gcash-upload', upload.single('file'), async (req, res) => {
   try {
@@ -108,8 +122,10 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
 
     // Parse items if it's a string
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+    const sharedOrderNote = String(req.body.noteToStall || req.body.note || req.body.customerNote || '').trim();
+    const normalizedItems = normalizeOrderItems(parsedItems, sharedOrderNote);
 
-    const menuItemIds = (parsedItems || [])
+    const menuItemIds = normalizedItems
       .map((item) => item?.menuItemId)
       .filter(Boolean);
 
@@ -145,11 +161,11 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
     const storeName = store?.name || 'Store';
 
     const { orderNumber, queueNumber } = await getNextOrderIdentifiers(effectiveStallId);
-    const estimatedTime = await calculateEstimatedTime(parsedItems, effectiveStallId);
+    const estimatedTime = await calculateEstimatedTime(normalizedItems, effectiveStallId);
 
     const newOrder = new Order({
       customerId: customerId,
-      items: parsedItems,
+      items: normalizedItems,
       totalAmount: totalAmount || req.body.amount || 0,
       paymentMethod: 'gcash',
       paymentStatus: 'pending', // Payment pending approval

@@ -120,7 +120,7 @@ const Cart = () => {
           name: item.name,
           variation: item.selectedVariation || '',
           riceOption: item.selectedRiceOption || '',
-          noteToStall: String(item.noteToStall || '').trim(),
+          noteToStall: String(item.noteToStall || item.note || item.customerNote || '').trim(),
           quantity: item.quantity || 1,
           price: item.price
         })),

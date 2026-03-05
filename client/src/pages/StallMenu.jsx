@@ -37,7 +37,6 @@ const StallMenu = () => {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [activeTab, setActiveTab] = useState('products');
   const [orders, setOrders] = useState([]);
-  const [showQueueFlow, setShowQueueFlow] = useState(false);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
@@ -444,6 +443,7 @@ const StallMenu = () => {
           name: item.name,
           variation: item.selectedVariation || '',
           riceOption: item.selectedRiceOption || '',
+          noteToStall: String(item.noteToStall || item.note || item.customerNote || '').trim(),
           quantity: item.quantity || 1,
           price: item.price
         })),
@@ -872,7 +872,7 @@ const StallMenu = () => {
           <>
             {/* PENDING GCASH PAYMENTS SECTION */}
             {pendingPayments.length > 0 && (
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 mb-6 text-white">
+              <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-lg shadow-lg p-6 mb-6 text-white">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
                   💳 Pending GCash Payments 
                   <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm">
@@ -882,11 +882,11 @@ const StallMenu = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {pendingPayments.map(payment => (
-                    <div key={payment._id} className="bg-white bg-opacity-95 rounded-lg p-4 text-gray-900 border-2 border-orange-400">
+                    <div key={payment._id} className="bg-white bg-opacity-95 rounded-lg p-4 text-gray-900 border-2 border-red-400">
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <p className="text-xs text-gray-600 mb-1">Order Number</p>
-                          <p className="text-lg font-bold text-orange-600">#{payment.orderDbId?.orderNumber || payment.orderDbId?._id || 'N/A'}</p>
+                          <p className="text-lg font-bold text-red-600">#{payment.orderDbId?.orderNumber || payment.orderDbId?._id || 'N/A'}</p>
                           <p className="text-xs text-gray-600 mt-1">Queue #{payment.orderDbId?.queueNumber || 'N/A'} (Store Queue)</p>
                         </div>
                         <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">
@@ -998,14 +998,6 @@ const StallMenu = () => {
             <div className="bg-gradient-to-br from-[#c41e3a] to-[#8B0000] rounded-lg shadow-lg p-8 text-white">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-3xl font-bold">📋 Live Orders Queue</h2>
-              {hasActiveOrders && (
-                <button
-                  onClick={() => setShowQueueFlow(!showQueueFlow)}
-                  className="bg-white text-[#8B0000] px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm"
-                >
-                  {showQueueFlow ? '📊 List View' : '🔄 Queue Flow'}
-                </button>
-              )}
             </div>
 
             {/* Queue Statistics */}
@@ -1029,7 +1021,7 @@ const StallMenu = () => {
             </div>
 
             {/* Queue Flow Visualization */}
-            {showQueueFlow && hasActiveOrders && (
+            {hasActiveOrders && (
               <div className="bg-white bg-opacity-10 p-6 rounded-lg mb-8 overflow-x-auto">
                 <div className="flex items-center gap-2 min-w-max pb-2">
                   {getPendingOrders().map((order, idx) => (
@@ -1070,8 +1062,7 @@ const StallMenu = () => {
             )}
 
             {/* Orders by Status - List View */}
-            {(!showQueueFlow || !hasActiveOrders) && (
-              <div className="space-y-8">
+            <div className="space-y-8">
                 {/* Pending Orders */}
                 {getPendingOrders().length > 0 && (
                   <div>
@@ -1088,6 +1079,15 @@ const StallMenu = () => {
                             <span className="bg-yellow-400 text-gray-900 px-2 py-1 rounded text-xs font-bold">PENDING</span>
                           </div>
                           <p className="text-sm mb-2"><strong>Items:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                          <p className="text-sm mb-2">
+                            <strong>Customer Note:</strong>{' '}
+                            {(() => {
+                              const notes = order.items
+                                .map((item) => String(item?.noteToStall || item?.note || item?.customerNote || '').trim())
+                                .filter(Boolean);
+                              return notes.length ? notes.join(' | ') : 'No note';
+                            })()}
+                          </p>
                           <div className="grid grid-cols-2 gap-2 mb-3">
                             <div>
                               <p className="text-xs opacity-75"><strong>Amount:</strong></p>
@@ -1263,7 +1263,6 @@ const StallMenu = () => {
                   </div>
                 )}
               </div>
-            )}
           </div>
 
           <div className="mt-6 bg-white rounded-lg shadow border border-gray-200 p-6">

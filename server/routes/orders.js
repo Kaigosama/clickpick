@@ -87,6 +87,20 @@ const getRequesterFromToken = async (req) => {
   }
 };
 
+const normalizeOrderItems = (items = [], sharedNote = '') => {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    menuItemId: item?.menuItemId || item?._id,
+    name: String(item?.name || '').trim(),
+    variation: String(item?.variation || '').trim(),
+    riceOption: ['no_rice', 'with_rice'].includes(String(item?.riceOption || '').trim())
+      ? String(item?.riceOption || '').trim()
+      : '',
+    noteToStall: String(item?.noteToStall || item?.note || item?.customerNote || sharedNote || '').trim(),
+    quantity: Number(item?.quantity || 1),
+    price: Number(item?.price || 0)
+  }));
+};
+
 router.get('/', async (req, res) => {
   try {
     await processExpiredReadyOrders();
@@ -197,7 +211,10 @@ router.get('/:userId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const menuItemIds = (req.body.items || [])
+    const sharedOrderNote = String(req.body.noteToStall || req.body.note || req.body.customerNote || '').trim();
+    const normalizedItems = normalizeOrderItems(req.body.items, sharedOrderNote);
+
+    const menuItemIds = normalizedItems
       .map((item) => item?.menuItemId)
       .filter(Boolean);
 
@@ -231,11 +248,11 @@ router.post('/', async (req, res) => {
     }
 
     const { orderNumber, queueNumber } = await getNextOrderIdentifiers(resolvedStallId);
-    const estimatedTime = await calculateEstimatedTime(req.body.items, resolvedStallId);
+    const estimatedTime = await calculateEstimatedTime(normalizedItems, resolvedStallId);
 
     const newOrder = new Order({
       customerId: req.body.customerId,
-      items: req.body.items,
+      items: normalizedItems,
       totalAmount: req.body.totalAmount,
       paymentMethod: req.body.paymentMethod,
       stallId: resolvedStallId,
