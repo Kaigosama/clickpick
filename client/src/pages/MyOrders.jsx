@@ -313,15 +313,6 @@ const MyOrders = () => {
                   </button>
                   <button
                     onClick={() => {
-                      navigate('/my-orders');
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    My Orders
-                  </button>
-                  <button
-                    onClick={() => {
                       navigate('/order-history');
                       setShowMobileNavMenu(false);
                     }}

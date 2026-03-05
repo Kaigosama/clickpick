@@ -143,12 +143,6 @@ const OrderHistory = () => {
                     My Orders
                   </button>
                   <button
-                    onClick={() => setShowMobileNavMenu(false)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Order History
-                  </button>
-                  <button
                     onClick={() => {
                       navigate('/profile');
                       setShowMobileNavMenu(false);

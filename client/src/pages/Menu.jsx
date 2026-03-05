@@ -109,14 +109,6 @@ const Menu = () => {
                 <div className="absolute top-full right-0 mt-2 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50 min-w-44 overflow-hidden">
                   <button
                     onClick={() => {
-                      setShowMobileNavMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors font-semibold border-b border-gray-200"
-                  >
-                    Stores
-                  </button>
-                  <button
-                    onClick={() => {
                       navigate('/my-orders');
                       setShowMobileNavMenu(false);
                     }}
