@@ -12,6 +12,13 @@ import { getSocket } from '../services/socket.js';
 import { toServerAssetUrl } from '../services/assetUrl.js';
 import { jsPDF } from 'jspdf';
 
+const toDateInputValue = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const normalizeStoreOpen = (value) => {
   if (typeof value === 'boolean') return value;
   if (value === undefined || value === null) return true;
@@ -42,6 +49,7 @@ const StallMenu = () => {
   const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);
   const [salesReport, setSalesReport] = useState(null);
+  const [selectedSalesReportDate, setSelectedSalesReportDate] = useState(() => toDateInputValue(new Date()));
   const [cancelledOrders, setCancelledOrders] = useState([]);
   const [refundProofFiles, setRefundProofFiles] = useState({});
   const [uploadingRefundForOrder, setUploadingRefundForOrder] = useState('');
@@ -244,11 +252,12 @@ const StallMenu = () => {
     }
   };
 
-  const refreshDailySalesReport = async () => {
+  const refreshDailySalesReport = async (targetDate = selectedSalesReportDate) => {
     if (!isStaff || !user?._id) return;
 
     try {
-      const res = await api.get(`/orders/report/daily?stallId=${user._id}`);
+      const encodedDate = encodeURIComponent(String(targetDate || ''));
+      const res = await api.get(`/orders/report/daily?stallId=${user._id}&date=${encodedDate}`);
       setSalesReport(res.data || null);
     } catch (err) {
       console.error('Error fetching daily sales report:', err);
@@ -269,34 +278,24 @@ const StallMenu = () => {
       };
       
       refreshStaffOrders();
-      refreshDailySalesReport();
+      refreshDailySalesReport(selectedSalesReportDate);
       fetchPendingPayments();
 
       const interval = setInterval(() => {
         refreshStaffOrders();
-        refreshDailySalesReport();
+        refreshDailySalesReport(selectedSalesReportDate);
         fetchPendingPayments();
       }, 5000);
       return () => clearInterval(interval);
     }
-  }, [isStaff, user?._id]);
+  }, [isStaff, user?._id, selectedSalesReportDate]);
 
-  const buildSalesExportRows = () => {
-    return salesOrders.map((order) => {
-      const placedAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A';
-      const completedAt = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'N/A';
-      const items = order.items?.map((item) => `${item.quantity || 1}x ${item.name}`).join(', ') || 'N/A';
-      const orderId = order.orderNumber || order.queueNumber || order._id;
-      const payment = order.paymentMethod?.toUpperCase() || 'CASH';
-
-      return {
-        placedAt,
-        items,
-        orderId,
-        payment,
-        completedAt
-      };
-    });
+  const buildSalesReportExportRows = () => {
+    const itemsSold = salesReport?.itemsSold || {};
+    return Object.entries(itemsSold).map(([itemName, quantity]) => ({
+      itemName,
+      quantity: Number(quantity || 0)
+    }));
   };
 
   const getSalesExportFilename = (extension) => {
@@ -305,20 +304,26 @@ const StallMenu = () => {
   };
 
   const handleExportSalesCSV = () => {
-    if (!salesOrders.length) {
+    if (!salesReport) {
+      alert('No sales report selected.');
+      return;
+    }
+
+    const rowsData = buildSalesReportExportRows();
+    if (!rowsData.length) {
       alert('No sales data to export.');
       return;
     }
 
-    const rows = buildSalesExportRows().map((row) => [
-      row.placedAt,
-      row.items,
-      row.orderId,
-      row.payment,
-      row.completedAt
+    const rows = rowsData.map((row) => [
+      salesReport?.date || selectedSalesReportDate,
+      row.itemName,
+      row.quantity,
+      Number(salesReport?.totalOrders || 0),
+      Number(salesReport?.totalRevenue || 0).toFixed(2)
     ]);
 
-    const header = ['ORDER PLACED DATE/TIME', 'ITEM', 'ORDER ID', 'PAYMENT', 'ORDER COMPLETED DATE/TIME'];
+    const header = ['REPORT DATE', 'ITEM', 'QTY SOLD', 'TOTAL ORDERS', 'TOTAL REVENUE'];
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -335,12 +340,17 @@ const StallMenu = () => {
   };
 
   const handleExportSalesPDF = () => {
-    if (!salesOrders.length) {
+    if (!salesReport) {
+      alert('No sales report selected.');
+      return;
+    }
+
+    const rows = buildSalesReportExportRows();
+    if (!rows.length) {
       alert('No sales data to export.');
       return;
     }
 
-    const rows = buildSalesExportRows();
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     const leftMargin = 10;
@@ -351,11 +361,8 @@ const StallMenu = () => {
     const tableWidth = pageWidth - leftMargin - rightMargin;
 
     const columns = [
-      { key: 'placedAt', label: 'ORDER PLACED DATE/TIME', width: 50 },
-      { key: 'items', label: 'ITEM', width: 95 },
-      { key: 'orderId', label: 'ORDER ID', width: 35 },
-      { key: 'payment', label: 'PAYMENT', width: 25 },
-      { key: 'completedAt', label: 'ORDER COMPLETED DATE/TIME', width: 55 }
+      { key: 'itemName', label: 'ITEM', width: 140 },
+      { key: 'quantity', label: 'QTY SOLD', width: 45 }
     ];
 
     const widthScale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
@@ -381,9 +388,11 @@ const StallMenu = () => {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, leftMargin, topMargin + 5);
+    doc.text(`Report Date: ${salesReport?.date || selectedSalesReportDate}`, leftMargin, topMargin + 5);
+    doc.text(`Total Orders: ${Number(salesReport?.totalOrders || 0)}`, leftMargin, topMargin + 10);
+    doc.text(`Total Revenue: PHP ${Number(salesReport?.totalRevenue || 0).toFixed(2)}`, leftMargin + 70, topMargin + 10);
 
-    let currentY = topMargin + 10;
+    let currentY = topMargin + 15;
     currentY = renderHeader(currentY);
 
     rows.forEach((row) => {
@@ -1343,6 +1352,24 @@ const StallMenu = () => {
           <div className="bg-white rounded-lg shadow border border-gray-200 p-6 md:p-8">
             <div className="flex items-center justify-center mb-6">
               <h2 className="text-3xl md:text-4xl font-black tracking-wide text-gray-900">SALES</h2>
+            </div>
+
+            <div className="mb-5 flex flex-col sm:flex-row sm:items-end gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-1">Report Date</label>
+                <input
+                  type="date"
+                  value={selectedSalesReportDate}
+                  onChange={(e) => setSelectedSalesReportDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <button
+                onClick={() => refreshDailySalesReport(selectedSalesReportDate)}
+                className="px-4 py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Load Report
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

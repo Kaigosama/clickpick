@@ -166,12 +166,20 @@ router.get('/', async (req, res) => {
 router.get('/report/daily', async (req, res) => {
   try {
     const requester = await getRequesterFromToken(req);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const requestedDateRaw = String(req.query.date || '').trim();
+    const reportDate = requestedDateRaw ? new Date(requestedDateRaw) : new Date();
+
+    if (Number.isNaN(reportDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
+    reportDate.setHours(0, 0, 0, 0);
+    const nextDate = new Date(reportDate);
+    nextDate.setDate(nextDate.getDate() + 1);
 
     const query = {
       status: 'completed',
-      createdAt: { $gte: today }
+      createdAt: { $gte: reportDate, $lt: nextDate }
     };
 
     if (requester?.role === 'stall_staff') {
@@ -195,7 +203,7 @@ router.get('/report/daily', async (req, res) => {
     const effectiveStallId = requester?.role === 'stall_staff' ? requester._id : (req.query.stallId || null);
     if (effectiveStallId) {
       await SalesReport.findOneAndUpdate(
-        { stallId: effectiveStallId, reportDate: today },
+        { stallId: effectiveStallId, reportDate },
         {
           $set: {
             totalOrders: orders.length,
@@ -209,7 +217,8 @@ router.get('/report/daily', async (req, res) => {
     }
 
     res.status(200).json({
-      date: today.toDateString(),
+      date: reportDate.toDateString(),
+      reportDate,
       totalOrders: orders.length,
       totalRevenue,
       itemsSold: itemBreakdown
