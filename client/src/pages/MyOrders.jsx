@@ -51,29 +51,6 @@ const MyOrders = () => {
   }, []);
 
   useEffect(() => {
-    const storedOrderId = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
-    const storedExpiresAt = String(localStorage.getItem(ACTIVE_GCASH_EXPIRES_AT_KEY) || '').trim();
-
-    if (!storedOrderId) {
-      return;
-    }
-
-    setActiveGcashSession((prev) => {
-      if (prev?.orderId && String(prev.orderId) === storedOrderId) {
-        return prev;
-      }
-
-      return {
-        hasActiveSession: true,
-        orderId: storedOrderId,
-        orderNumber: null,
-        queueNumber: null,
-        expiresAt: storedExpiresAt || null
-      };
-    });
-  }, []);
-
-  useEffect(() => {
     if (!user) navigate('/');
     
     const fetchOrders = async () => {
@@ -166,10 +143,7 @@ const MyOrders = () => {
         setQueueOrdersByStore(Object.fromEntries(queueResponses));
       } catch (err) {
         console.error(err);
-        const storedOrderId = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
-        if (!storedOrderId) {
-          setActiveGcashSession(null);
-        }
+        setActiveGcashSession(null);
       } finally {
         setLoading(false);
       }

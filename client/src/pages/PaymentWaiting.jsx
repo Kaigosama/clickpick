@@ -45,11 +45,26 @@ const PaymentWaiting = () => {
 
         const fromStorage = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
         if (fromStorage) {
-          if (isMounted) {
-            setOrderId(fromStorage);
-            setIsResolvingSession(false);
+          const statusRes = await api.get(`/payments/gcash-status/${fromStorage}`).catch(() => null);
+          const statusValue = String(statusRes?.data?.status || '').toLowerCase();
+
+          if (statusValue) {
+            if (isMounted) {
+              setOrderId(fromStorage);
+              setOrderNumber(statusRes?.data?.orderNumber || null);
+              setQueueNumber(statusRes?.data?.queueNumber || null);
+              setTimeLeftSeconds(
+                Number.isFinite(statusRes?.data?.timeRemainingSeconds)
+                  ? statusRes.data.timeRemainingSeconds
+                  : null
+              );
+              setIsResolvingSession(false);
+            }
+            return;
           }
-          return;
+
+          localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
+          localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
         }
 
         const response = await api.get('/payments/gcash-active-session');

@@ -7,6 +7,8 @@ import api from '../services/api.js';
 
 const GCASH_DRAFT_SESSION_KEY = 'activeGcashDraftSession';
 const GCASH_UPLOAD_WINDOW_SECONDS = 300;
+const ACTIVE_GCASH_ORDER_KEY = 'activeGcashOrderId';
+const ACTIVE_GCASH_EXPIRES_AT_KEY = 'activeGcashPaymentExpiresAt';
 
 const GCashPayment = () => {
   const navigate = useNavigate();
@@ -46,6 +48,12 @@ const GCashPayment = () => {
   const clearDraftSession = () => {
     localStorage.removeItem(GCASH_DRAFT_SESSION_KEY);
   };
+
+  useEffect(() => {
+    // Entering pre-upload flow means no submitted proof exists yet for this attempt.
+    localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
+    localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
+  }, []);
 
   useEffect(() => {
     const fetchGcashNumber = async () => {
