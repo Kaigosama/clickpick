@@ -253,7 +253,7 @@ const ProductDetail = ({ item, stall, stallId, onClose, onAddToCart }) => {
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Add to Basket
+              Add to Cart
             </button>
           </div>
         </div>

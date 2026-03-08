@@ -1804,7 +1804,7 @@ const StallMenu = () => {
                                           : 'bg-[#8B0000] text-white hover:bg-red-800'
                                       }`}
                                     >
-                                      {requiresVariationChoice ? 'Choose Variation' : requiresRiceChoice ? 'Choose Rice Option' : 'Add to Basket'}
+                                      {requiresVariationChoice ? 'Choose Variation' : requiresRiceChoice ? 'Choose Rice Option' : 'Add to Cart'}
                                     </button>
                                   </div>
                                 </div>
