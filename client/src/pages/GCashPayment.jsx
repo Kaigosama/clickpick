@@ -10,6 +10,16 @@ const GCASH_UPLOAD_WINDOW_SECONDS = 300;
 const ACTIVE_GCASH_ORDER_KEY = 'activeGcashOrderId';
 const ACTIVE_GCASH_EXPIRES_AT_KEY = 'activeGcashPaymentExpiresAt';
 
+const readGcashDraftSession = () => {
+  try {
+    const raw = localStorage.getItem(GCASH_DRAFT_SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 const GCashPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +29,7 @@ const GCashPayment = () => {
   const [uploading, setUploading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(GCASH_UPLOAD_WINDOW_SECONDS);
   const [draftExpiresAtMs, setDraftExpiresAtMs] = useState(null);
+  const [draftSession, setDraftSession] = useState(() => readGcashDraftSession());
   const [uploaded, setUploaded] = useState(false);
   const [gcashNumber, setGcashNumber] = useState('Not available');
 
@@ -32,25 +43,18 @@ const GCashPayment = () => {
 
   const getSelectedStallId = () => {
     const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
-    return String(location.state?.stallId || storeIdsInCart[0] || '');
-  };
-
-  const readDraftSession = () => {
-    try {
-      const raw = localStorage.getItem(GCASH_DRAFT_SESSION_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+    return String(location.state?.stallId || storeIdsInCart[0] || draftSession?.stallId || '');
   };
 
   const clearDraftSession = () => {
     localStorage.removeItem(GCASH_DRAFT_SESSION_KEY);
   };
 
+  const displayAmount = Number(cartTotal || 0) > 0
+    ? Number(cartTotal || 0)
+    : Number(draftSession?.cartTotal || 0);
+
   useEffect(() => {
-    // Entering pre-upload flow means no submitted proof exists yet for this attempt.
     localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
     localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
   }, []);
@@ -62,7 +66,7 @@ const GCashPayment = () => {
         const list = Array.isArray(res.data) ? res.data : res.data?.stalls || [];
 
         const firstCartItem = cartItems[0];
-        const targetStallId = String(location.state?.stallId || resolveStoreId(firstCartItem));
+        const targetStallId = String(location.state?.stallId || resolveStoreId(firstCartItem) || draftSession?.stallId || '');
         const stall = list.find((entry) => String(entry._id) === targetStallId);
 
         if (stall?.gcashNumber && String(stall.gcashNumber).trim()) {
@@ -78,11 +82,11 @@ const GCashPayment = () => {
     };
 
     fetchGcashNumber();
-  }, [cartItems, location.state]);
+  }, [cartItems, location.state, draftSession?.stallId]);
 
   useEffect(() => {
     const selectedStallId = getSelectedStallId();
-    const existingDraft = readDraftSession();
+    const existingDraft = readGcashDraftSession();
 
     if (existingDraft?.expiresAt) {
       const existingExpiryMs = new Date(existingDraft.expiresAt).getTime();
@@ -90,6 +94,7 @@ const GCashPayment = () => {
 
       if (remainingSeconds > 0) {
         setDraftExpiresAtMs(existingExpiryMs);
+        setDraftSession(existingDraft);
         setTimeLeft(remainingSeconds);
         return;
       }
@@ -104,16 +109,14 @@ const GCashPayment = () => {
     const nowMs = Date.now();
     const expiresAt = new Date(nowMs + (GCASH_UPLOAD_WINDOW_SECONDS * 1000)).toISOString();
     const expiryMs = new Date(expiresAt).getTime();
+    const nextDraft = {
+      stallId: selectedStallId,
+      expiresAt,
+      cartTotal: Number(displayAmount || 0)
+    };
 
-    localStorage.setItem(
-      GCASH_DRAFT_SESSION_KEY,
-      JSON.stringify({
-        stallId: selectedStallId,
-        expiresAt,
-        cartTotal: Number(cartTotal || 0)
-      })
-    );
-
+    localStorage.setItem(GCASH_DRAFT_SESSION_KEY, JSON.stringify(nextDraft));
+    setDraftSession(nextDraft);
     setDraftExpiresAtMs(expiryMs);
     setTimeLeft(GCASH_UPLOAD_WINDOW_SECONDS);
   }, [cartItems, cartTotal, location.state]);
@@ -135,6 +138,7 @@ const GCashPayment = () => {
     }
 
     setDraftExpiresAtMs(null);
+    setDraftSession(null);
     clearDraftSession();
   }, [timeLeft]);
 
@@ -167,7 +171,7 @@ const GCashPayment = () => {
       return;
     }
 
-    const selectedStallId = String(location.state?.stallId || storeIdsInCart[0] || '');
+    const selectedStallId = String(location.state?.stallId || storeIdsInCart[0] || draftSession?.stallId || '');
 
     setUploading(true);
     try {
@@ -175,8 +179,8 @@ const GCashPayment = () => {
       formData.append('file', file);
       formData.append('customerId', user._id);
       formData.append('stallId', selectedStallId);
-      formData.append('amount', cartTotal);
-      formData.append('totalAmount', cartTotal);
+      formData.append('amount', displayAmount);
+      formData.append('totalAmount', displayAmount);
 
       const orderItems = cartItems.map((item) => ({
         menuItemId: item._id,
@@ -198,6 +202,7 @@ const GCashPayment = () => {
       setUploaded(true);
       clearCart();
       setDraftExpiresAtMs(null);
+      setDraftSession(null);
       clearDraftSession();
       alert('Proof of payment uploaded successfully! Waiting for store approval...');
 
@@ -251,13 +256,13 @@ const GCashPayment = () => {
           <div className="bg-gradient-to-r from-[#8B0000] to-red-700 text-white p-6 rounded-lg shadow-lg">
             <p className="text-sm font-semibold mb-2">Send payment to</p>
             <p className="text-3xl font-bold tracking-wider">{gcashNumber}</p>
-            <p className="text-sm mt-3 opacity-90">Amount: ₱{cartTotal.toFixed(2)}</p>
+            <p className="text-sm mt-3 opacity-90">Amount: ₱{displayAmount.toFixed(2)}</p>
           </div>
 
           <div className="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-300 space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Instructions:</h3>
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Send ₱{cartTotal.toFixed(2)} to the GCash number above</li>
+              <li>Send ₱{displayAmount.toFixed(2)} to the GCash number above</li>
               <li>Screenshot or take a photo of the successful transaction</li>
               <li>Upload the proof of payment below</li>
               <li>Wait for store approval (you&apos;ll receive the status via notification)</li>
@@ -325,6 +330,7 @@ const GCashPayment = () => {
           <button
             onClick={() => {
               setDraftExpiresAtMs(null);
+              setDraftSession(null);
               clearDraftSession();
               navigate('/cart');
             }}
