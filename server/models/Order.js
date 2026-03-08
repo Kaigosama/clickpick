@@ -21,7 +21,7 @@ const OrderSchema = new mongoose.Schema({
   autoCancelledAt: { type: Date },
   cancellationReason: {
     type: String,
-    enum: ['none', 'manual_cancel', 'grace_period_expired', 'payment_rejected'],
+    enum: ['none', 'manual_cancel', 'grace_period_expired', 'payment_rejected', 'payment_timeout'],
     default: 'none'
   },
   refundRequired: { type: Boolean, default: false },

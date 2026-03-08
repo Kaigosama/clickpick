@@ -5,6 +5,9 @@ import { useCart } from '../context/CartContext.jsx';
 import CustomerHeader from '../components/CustomerHeader.jsx';
 import api from '../services/api.js';
 
+const GCASH_DRAFT_SESSION_KEY = 'activeGcashDraftSession';
+const GCASH_UPLOAD_WINDOW_SECONDS = 300;
+
 const GCashPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,7 +15,8 @@ const GCashPayment = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300);
+  const [timeLeft, setTimeLeft] = useState(GCASH_UPLOAD_WINDOW_SECONDS);
+  const [draftExpiresAtMs, setDraftExpiresAtMs] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const [gcashNumber, setGcashNumber] = useState('Not available');
 
@@ -22,6 +26,25 @@ const GCashPayment = () => {
       return String(rawStoreId._id || rawStoreId.id || rawStoreId.stallId || '');
     }
     return String(rawStoreId || '');
+  };
+
+  const getSelectedStallId = () => {
+    const storeIdsInCart = Array.from(new Set(cartItems.map((item) => resolveStoreId(item)).filter(Boolean)));
+    return String(location.state?.stallId || storeIdsInCart[0] || '');
+  };
+
+  const readDraftSession = () => {
+    try {
+      const raw = localStorage.getItem(GCASH_DRAFT_SESSION_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const clearDraftSession = () => {
+    localStorage.removeItem(GCASH_DRAFT_SESSION_KEY);
   };
 
   useEffect(() => {
@@ -50,14 +73,62 @@ const GCashPayment = () => {
   }, [cartItems, location.state]);
 
   useEffect(() => {
-    if (timeLeft <= 0 || uploaded) return;
+    const selectedStallId = getSelectedStallId();
+    const existingDraft = readDraftSession();
+
+    if (existingDraft?.expiresAt) {
+      const existingExpiryMs = new Date(existingDraft.expiresAt).getTime();
+      const remainingSeconds = Math.max(0, Math.ceil((existingExpiryMs - Date.now()) / 1000));
+
+      if (remainingSeconds > 0) {
+        setDraftExpiresAtMs(existingExpiryMs);
+        setTimeLeft(remainingSeconds);
+        return;
+      }
+
+      clearDraftSession();
+    }
+
+    if (!selectedStallId) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    const expiresAt = new Date(nowMs + (GCASH_UPLOAD_WINDOW_SECONDS * 1000)).toISOString();
+    const expiryMs = new Date(expiresAt).getTime();
+
+    localStorage.setItem(
+      GCASH_DRAFT_SESSION_KEY,
+      JSON.stringify({
+        stallId: selectedStallId,
+        expiresAt,
+        cartTotal: Number(cartTotal || 0)
+      })
+    );
+
+    setDraftExpiresAtMs(expiryMs);
+    setTimeLeft(GCASH_UPLOAD_WINDOW_SECONDS);
+  }, [cartItems, cartTotal, location.state]);
+
+  useEffect(() => {
+    if (!draftExpiresAtMs || uploaded) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+      const remainingSeconds = Math.max(0, Math.ceil((draftExpiresAtMs - Date.now()) / 1000));
+      setTimeLeft(remainingSeconds);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, uploaded]);
+  }, [draftExpiresAtMs, uploaded]);
+
+  useEffect(() => {
+    if (timeLeft > 0) {
+      return;
+    }
+
+    setDraftExpiresAtMs(null);
+    clearDraftSession();
+  }, [timeLeft]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -76,6 +147,7 @@ const GCashPayment = () => {
     }
 
     if (timeLeft <= 0) {
+      clearDraftSession();
       alert('Time limit exceeded! Please go back and try again.');
       return;
     }
@@ -117,12 +189,22 @@ const GCashPayment = () => {
 
       setUploaded(true);
       clearCart();
+      setDraftExpiresAtMs(null);
+      clearDraftSession();
       alert('Proof of payment uploaded successfully! Waiting for store approval...');
+
+      if (response.data?.orderId) {
+        localStorage.setItem('activeGcashOrderId', String(response.data.orderId));
+      }
+      if (response.data?.expiresAt) {
+        localStorage.setItem('activeGcashPaymentExpiresAt', String(response.data.expiresAt));
+      }
 
       navigate('/payment-waiting', {
         state: {
           orderId: response.data?.orderId,
-          orderDbId: response.data?.orderDbId
+          orderDbId: response.data?.orderDbId,
+          expiresAt: response.data?.expiresAt
         }
       });
     } catch (err) {
@@ -233,7 +315,11 @@ const GCashPayment = () => {
 
         <div className="mt-6">
           <button
-            onClick={() => navigate('/cart')}
+            onClick={() => {
+              setDraftExpiresAtMs(null);
+              clearDraftSession();
+              navigate('/cart');
+            }}
             className="w-full py-2 bg-gray-200 text-gray-900 font-bold rounded-lg hover:bg-gray-300 transition-colors"
           >
             Cancel

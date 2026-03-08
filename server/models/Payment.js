@@ -16,6 +16,8 @@ const PaymentSchema = new mongoose.Schema({
   proofOfPaymentPath: { type: String },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   rejectionReason: { type: String },
+  expiresAt: { type: Date },
+  autoCancelledAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
   approvedAt: { type: Date }
 }, { timestamps: true });

@@ -11,6 +11,8 @@ const Transaction = require('../models/Transaction');
 const { sendStatusSMS } = require('../utils/smsService');
 const { deductInventoryForOrder, restoreInventoryForOrder } = require('../utils/inventoryService');
 
+const GCASH_PENDING_TIMEOUT_SECONDS = 300;
+
 const getRequesterFromToken = async (req) => {
   const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
@@ -111,6 +113,52 @@ const normalizeOrderItems = (items = [], sharedNote = '') => {
   }));
 };
 
+const isPaymentExpired = (payment, now = new Date()) => {
+  if (!payment?.expiresAt) {
+    return false;
+  }
+  return new Date(payment.expiresAt).getTime() <= now.getTime();
+};
+
+const cancelExpiredPendingPayment = async (payment, now = new Date()) => {
+  if (!payment || String(payment.status || '').toLowerCase() !== 'pending' || !isPaymentExpired(payment, now)) {
+    return false;
+  }
+
+  if (payment.orderDbId) {
+    const order = await Order.findById(payment.orderDbId);
+
+    if (order && String(order.status || '').toLowerCase() !== 'cancelled') {
+      const inventoryAlreadyDeducted = order.inventoryDeducted === true || order.inventoryDeducted === undefined;
+      if (inventoryAlreadyDeducted) {
+        await restoreInventoryForOrder(order);
+        order.inventoryDeducted = false;
+      }
+
+      order.status = 'cancelled';
+      order.paymentStatus = 'rejected';
+      order.cancellationReason = 'payment_timeout';
+      order.refundRequired = false;
+      order.refundStatus = 'not_required';
+      order.gracePeriodExpiresAt = undefined;
+      order.readyAt = undefined;
+      await order.save();
+    }
+
+    await Transaction.findOneAndUpdate(
+      { orderId: payment.orderDbId },
+      { $set: { status: 'rejected' } }
+    );
+  }
+
+  payment.status = 'rejected';
+  payment.rejectionReason = payment.rejectionReason || 'payment_timeout';
+  payment.autoCancelledAt = now;
+  await payment.save();
+
+  return true;
+};
+
 // Upload GCash proof of payment
 router.post('/gcash-upload', upload.single('file'), async (req, res) => {
   try {
@@ -162,6 +210,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
 
     const { orderNumber, queueNumber } = await getNextOrderIdentifiers(effectiveStallId);
     const estimatedTime = await calculateEstimatedTime(normalizedItems, effectiveStallId);
+    const expiresAt = new Date(Date.now() + (GCASH_PENDING_TIMEOUT_SECONDS * 1000));
 
     const newOrder = new Order({
       customerId: customerId,
@@ -201,6 +250,7 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       paymentMethod: 'gcash',
       amount: totalAmount || req.body.amount || 0,
       status: 'pending',
+      expiresAt,
       proofOfPaymentUrl: toImageDataUrl(req.file)
     });
 
@@ -222,7 +272,8 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
       message: 'Proof of payment uploaded successfully',
       paymentId: payment._id,
       orderId: stableOrderId,
-      orderDbId: savedOrder._id
+      orderDbId: savedOrder._id,
+      expiresAt: payment.expiresAt
     });
   } catch (err) {
     console.error('GCash upload error:', err);
@@ -237,13 +288,35 @@ router.post('/gcash-upload', upload.single('file'), async (req, res) => {
 router.get('/gcash-status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
+    const requester = await getRequesterFromToken(req);
 
     const payment = await Payment.findOne({ orderId: orderId })
-      .populate('orderDbId', 'orderNumber queueNumber _id');
+      .populate('orderDbId', 'orderNumber queueNumber _id stallId');
 
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
+
+    if (!requester) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (requester.role === 'customer' && String(payment.customerId) !== String(requester._id)) {
+      return res.status(403).json({ message: 'You can only view your own payment status' });
+    }
+
+    if (requester.role === 'stall_staff') {
+      const paymentStallId = payment.stallId
+        ? String(payment.stallId)
+        : (payment.orderDbId?.stallId ? String(payment.orderDbId.stallId) : '');
+
+      if (!paymentStallId || paymentStallId !== String(requester._id)) {
+        return res.status(403).json({ message: 'You can only view payment status for your own store' });
+      }
+    }
+
+    const now = new Date();
+    await cancelExpiredPendingPayment(payment, now);
 
     res.json({
       status: payment.status,
@@ -251,11 +324,72 @@ router.get('/gcash-status/:orderId', async (req, res) => {
       orderNumber: payment.orderDbId?.orderNumber,
       queueNumber: payment.orderDbId?.queueNumber,
       approvedAt: payment.approvedAt,
-      rejectionReason: payment.rejectionReason
+      rejectionReason: payment.rejectionReason,
+      expiresAt: payment.expiresAt,
+      autoCancelledAt: payment.autoCancelledAt,
+      timeRemainingSeconds: payment.expiresAt
+        ? Math.max(0, Math.ceil((new Date(payment.expiresAt).getTime() - now.getTime()) / 1000))
+        : null
     });
   } catch (err) {
     console.error('Get status error:', err);
     res.status(500).json({ message: 'Error fetching status: ' + err.message });
+  }
+});
+
+router.get('/gcash-active-session', async (req, res) => {
+  try {
+    const requester = await getRequesterFromToken(req);
+
+    if (!requester) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (requester.role !== 'customer') {
+      return res.status(403).json({ message: 'Only customers can resume GCash sessions' });
+    }
+
+    const now = new Date();
+    const pendingPayments = await Payment.find({
+      customerId: requester._id,
+      paymentMethod: 'gcash',
+      status: 'pending'
+    })
+      .populate('orderDbId', 'orderNumber queueNumber _id')
+      .sort({ createdAt: -1 });
+
+    for (const payment of pendingPayments) {
+      await cancelExpiredPendingPayment(payment, now);
+    }
+
+    const activePayment = await Payment.findOne({
+      customerId: requester._id,
+      paymentMethod: 'gcash',
+      status: 'pending'
+    })
+      .populate('orderDbId', 'orderNumber queueNumber _id')
+      .sort({ createdAt: -1 });
+
+    if (!activePayment) {
+      return res.json({
+        hasActiveSession: false
+      });
+    }
+
+    res.json({
+      hasActiveSession: true,
+      orderId: activePayment.orderId,
+      orderNumber: activePayment.orderDbId?.orderNumber,
+      queueNumber: activePayment.orderDbId?.queueNumber,
+      status: activePayment.status,
+      expiresAt: activePayment.expiresAt,
+      timeRemainingSeconds: activePayment.expiresAt
+        ? Math.max(0, Math.ceil((new Date(activePayment.expiresAt).getTime() - now.getTime()) / 1000))
+        : null
+    });
+  } catch (err) {
+    console.error('Get active session error:', err);
+    res.status(500).json({ message: 'Error getting active GCash session: ' + err.message });
   }
 });
 

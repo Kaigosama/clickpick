@@ -5,6 +5,10 @@ import { AuthContext } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import CustomerHeader from '../components/CustomerHeader.jsx';
 
+const ACTIVE_GCASH_ORDER_KEY = 'activeGcashOrderId';
+const ACTIVE_GCASH_EXPIRES_AT_KEY = 'activeGcashPaymentExpiresAt';
+const ACTIVE_GCASH_DRAFT_KEY = 'activeGcashDraftSession';
+
 const MyOrders = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -16,6 +20,8 @@ const MyOrders = () => {
   const [showQueue, setShowQueue] = useState(true);
   const [cancellingOrderId, setCancellingOrderId] = useState('');
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [activeGcashSession, setActiveGcashSession] = useState(null);
+  const [draftGcashSession, setDraftGcashSession] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -26,14 +32,100 @@ const MyOrders = () => {
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ACTIVE_GCASH_DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.expiresAt) return;
+
+      const remainingMs = new Date(parsed.expiresAt).getTime() - Date.now();
+      if (remainingMs <= 0) {
+        localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+        return;
+      }
+
+      setDraftGcashSession(parsed);
+    } catch (err) {
+      localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedOrderId = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
+    const storedExpiresAt = String(localStorage.getItem(ACTIVE_GCASH_EXPIRES_AT_KEY) || '').trim();
+
+    if (!storedOrderId) {
+      return;
+    }
+
+    setActiveGcashSession((prev) => {
+      if (prev?.orderId && String(prev.orderId) === storedOrderId) {
+        return prev;
+      }
+
+      return {
+        hasActiveSession: true,
+        orderId: storedOrderId,
+        orderNumber: null,
+        queueNumber: null,
+        expiresAt: storedExpiresAt || null
+      };
+    });
+  }, []);
+
+  useEffect(() => {
     if (!user) navigate('/');
     
     const fetchOrders = async () => {
       // Fetch user's orders
       try {
-        const res = await api.get(`/orders/${user?._id}`);
-        const userOrders = res.data || [];
+        const [ordersRes, activeSessionRes] = await Promise.all([
+          api.get(`/orders/${user?._id}`),
+          api.get('/payments/gcash-active-session').catch(() => ({ data: { hasActiveSession: false } }))
+        ]);
+
+        const userOrders = ordersRes.data || [];
         setOrders(userOrders);
+
+        if (activeSessionRes?.data?.hasActiveSession) {
+          setActiveGcashSession(activeSessionRes.data);
+          setDraftGcashSession(null);
+          localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+          localStorage.setItem(ACTIVE_GCASH_ORDER_KEY, String(activeSessionRes.data.orderId || ''));
+          if (activeSessionRes.data.expiresAt) {
+            localStorage.setItem(ACTIVE_GCASH_EXPIRES_AT_KEY, String(activeSessionRes.data.expiresAt));
+          }
+        } else {
+          const storedOrderId = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
+
+          if (storedOrderId) {
+            const fallbackStatusRes = await api
+              .get(`/payments/gcash-status/${storedOrderId}`)
+              .catch(() => null);
+
+            const fallbackStatus = String(fallbackStatusRes?.data?.status || '').toLowerCase();
+            if (fallbackStatus === 'pending') {
+              setActiveGcashSession({
+                hasActiveSession: true,
+                orderId: storedOrderId,
+                orderNumber: fallbackStatusRes?.data?.orderNumber,
+                queueNumber: fallbackStatusRes?.data?.queueNumber,
+                expiresAt: fallbackStatusRes?.data?.expiresAt,
+                timeRemainingSeconds: fallbackStatusRes?.data?.timeRemainingSeconds
+              });
+
+              if (fallbackStatusRes?.data?.expiresAt) {
+                localStorage.setItem(ACTIVE_GCASH_EXPIRES_AT_KEY, String(fallbackStatusRes.data.expiresAt));
+              }
+            } else {
+              localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
+              localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
+              setActiveGcashSession(null);
+            }
+          } else {
+            setActiveGcashSession(null);
+          }
+        }
 
         const activeUserOrders = userOrders.filter((order) => {
           const status = String(order?.status || '').toLowerCase();
@@ -74,6 +166,10 @@ const MyOrders = () => {
         setQueueOrdersByStore(Object.fromEntries(queueResponses));
       } catch (err) {
         console.error(err);
+        const storedOrderId = String(localStorage.getItem(ACTIVE_GCASH_ORDER_KEY) || '').trim();
+        if (!storedOrderId) {
+          setActiveGcashSession(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -265,6 +361,30 @@ const MyOrders = () => {
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
   };
 
+  const getActiveGcashTimeLeftMs = () => {
+    if (!activeGcashSession?.expiresAt) {
+      return null;
+    }
+
+    const remaining = new Date(activeGcashSession.expiresAt).getTime() - currentTime;
+    return Math.max(0, remaining);
+  };
+
+  const getDraftGcashTimeLeftMs = () => {
+    if (!draftGcashSession?.expiresAt) return null;
+    const remaining = new Date(draftGcashSession.expiresAt).getTime() - currentTime;
+    return Math.max(0, remaining);
+  };
+
+  useEffect(() => {
+    const remaining = getDraftGcashTimeLeftMs();
+    if (remaining === null) return;
+    if (remaining <= 0) {
+      setDraftGcashSession(null);
+      localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+    }
+  }, [currentTime, draftGcashSession]);
+
   return (
     <div className="min-h-screen bg-gray-100">
       <CustomerHeader activePage="my-orders" />
@@ -275,6 +395,56 @@ const MyOrders = () => {
           <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">My Orders</h1>
           <p className="text-gray-600">Track your active order status in real-time</p>
         </div>
+
+        {activeGcashSession && (
+          <div className="mb-8 bg-white border-2 border-blue-300 rounded-lg shadow p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-700">Active GCash Payment</p>
+                <h2 className="text-xl font-bold text-gray-900">Payment Processing In Progress</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Order #{activeGcashSession.orderNumber || 'Pending'} • Queue #{activeGcashSession.queueNumber || 'Pending'}
+                </p>
+                {getActiveGcashTimeLeftMs() !== null && (
+                  <p className="text-sm font-semibold text-blue-700 mt-2">
+                    Time left: {formatGraceTime(getActiveGcashTimeLeftMs())}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => navigate('/payment-waiting', { state: { orderId: activeGcashSession.orderId, expiresAt: activeGcashSession.expiresAt } })}
+                className="bg-[#8B0000] text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-800 transition-all"
+              >
+                Open Payment Page
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!activeGcashSession && draftGcashSession && (
+          <div className="mb-8 bg-white border-2 border-amber-300 rounded-lg shadow p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-700">GCash Payment In Progress</p>
+                <h2 className="text-xl font-bold text-gray-900">Complete your payment upload</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Your payment window is still active.
+                </p>
+                {getDraftGcashTimeLeftMs() !== null && (
+                  <p className="text-sm font-semibold text-amber-700 mt-2">
+                    Time left: {formatGraceTime(getDraftGcashTimeLeftMs())}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => navigate('/gcash-payment')}
+                className="bg-[#8B0000] text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-800 transition-all"
+              >
+                Resume GCash Payment
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* FIFO Queue Section */}
         {queueGroups.length > 0 && (
@@ -362,7 +532,7 @@ const MyOrders = () => {
           <div className="text-center py-12">
             <p className="text-gray-600">Loading your orders...</p>
           </div>
-        ) : activeOrders.length === 0 ? (
+        ) : activeOrders.length === 0 && !activeGcashSession && !draftGcashSession ? (
           <div className="bg-white rounded-lg shadow-lg p-12 text-center">
             <p className="text-gray-600 mb-6">No active orders right now</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
