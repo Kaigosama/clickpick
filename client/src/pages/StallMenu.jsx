@@ -299,7 +299,10 @@ const StallMenu = () => {
   };
 
   const getSalesExportFilename = (extension) => {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const candidate = String(salesReport?.date || selectedSalesReportDate || '').trim();
+    const stamp = /^\d{4}-\d{2}-\d{2}$/.test(candidate)
+      ? candidate
+      : toDateInputValue(new Date());
     return `sales-report-${stamp}.${extension}`;
   };
 
