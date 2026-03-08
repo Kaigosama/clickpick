@@ -1389,6 +1389,12 @@ const StallMenu = () => {
               </div>
             </div>
 
+            {salesReport && Number(salesReport.totalOrders || 0) === 0 && Object.keys(salesReport.itemsSold || {}).length === 0 && (
+              <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800 text-sm font-semibold">
+                No sales data found for {salesReport?.date || selectedSalesReportDate}.
+              </div>
+            )}
+
             <div className="border border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="text-lg font-bold text-gray-900 mb-3">Items Sold (Today)</h3>
               {Object.keys(salesReport?.itemsSold || {}).length === 0 ? (
