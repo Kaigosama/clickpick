@@ -41,6 +41,7 @@ const StallMenu = () => {
   const [selectedProof, setSelectedProof] = useState(null);
   const [showStaffMobileMenu, setShowStaffMobileMenu] = useState(false);
   const [salesOrders, setSalesOrders] = useState([]);
+  const [salesReport, setSalesReport] = useState(null);
   const [cancelledOrders, setCancelledOrders] = useState([]);
   const [refundProofFiles, setRefundProofFiles] = useState({});
   const [uploadingRefundForOrder, setUploadingRefundForOrder] = useState('');
@@ -243,6 +244,18 @@ const StallMenu = () => {
     }
   };
 
+  const refreshDailySalesReport = async () => {
+    if (!isStaff || !user?._id) return;
+
+    try {
+      const res = await api.get(`/orders/report/daily?stallId=${user._id}`);
+      setSalesReport(res.data || null);
+    } catch (err) {
+      console.error('Error fetching daily sales report:', err);
+      setSalesReport(null);
+    }
+  };
+
   // Fetch orders for staff
   useEffect(() => {
     if (isStaff) {
@@ -256,10 +269,12 @@ const StallMenu = () => {
       };
       
       refreshStaffOrders();
+      refreshDailySalesReport();
       fetchPendingPayments();
 
       const interval = setInterval(() => {
         refreshStaffOrders();
+        refreshDailySalesReport();
         fetchPendingPayments();
       }, 5000);
       return () => clearInterval(interval);
@@ -1328,6 +1343,39 @@ const StallMenu = () => {
           <div className="bg-white rounded-lg shadow border border-gray-200 p-6 md:p-8">
             <div className="flex items-center justify-center mb-6">
               <h2 className="text-3xl md:text-4xl font-black tracking-wide text-gray-900">SALES</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase text-gray-500">Report Date</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">
+                  {salesReport?.date || new Date().toDateString()}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase text-gray-500">Total Orders</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{Number(salesReport?.totalOrders || 0)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase text-gray-500">Total Revenue</p>
+                <p className="text-2xl font-bold text-green-700 mt-1">₱{Number(salesReport?.totalRevenue || 0).toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-3">Items Sold (Today)</h3>
+              {Object.keys(salesReport?.itemsSold || {}).length === 0 ? (
+                <p className="text-sm text-gray-500">No items sold yet for today.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {Object.entries(salesReport.itemsSold).map(([itemName, qty]) => (
+                    <div key={itemName} className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{itemName}</p>
+                      <p className="text-xs text-gray-600">Qty: {Number(qty || 0)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="border border-gray-200 rounded-lg overflow-hidden">

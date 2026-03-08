@@ -101,6 +101,47 @@ const normalizeOrderItems = (items = [], sharedNote = '') => {
   }));
 };
 
+const persistDailySalesReportForStall = async (stallId, date = new Date()) => {
+  if (!stallId) {
+    return;
+  }
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const completedOrders = await Order.find({
+    stallId,
+    status: 'completed',
+    createdAt: { $gte: dayStart, $lt: dayEnd }
+  });
+
+  const totalRevenue = completedOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  const itemBreakdown = {};
+
+  completedOrders.forEach((order) => {
+    (order.items || []).forEach((item) => {
+      const itemName = String(item?.name || '').trim() || 'Unknown Item';
+      itemBreakdown[itemName] = (itemBreakdown[itemName] || 0) + Number(item?.quantity || 0);
+    });
+  });
+
+  await SalesReport.findOneAndUpdate(
+    { stallId, reportDate: dayStart },
+    {
+      $set: {
+        totalOrders: completedOrders.length,
+        totalRevenue,
+        itemsSold: itemBreakdown,
+        generatedAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+};
+
 router.get('/', async (req, res) => {
   try {
     await processExpiredReadyOrders();
@@ -299,6 +340,10 @@ router.put('/:id', async (req, res) => {
 
     const updateData = { ...req.body };
 
+    const transitionedToCompleted =
+      String(req.body.status || '').toLowerCase() === 'completed' &&
+      String(existingOrder.status || '').toLowerCase() !== 'completed';
+
     if (req.body.status) {
       const nextStatus = String(req.body.status).toLowerCase();
       const isGcashOrder = String(existingOrder.paymentMethod || '').toLowerCase() === 'gcash';
@@ -376,6 +421,10 @@ router.put('/:id', async (req, res) => {
       if (phone) {
         await sendStatusSMS(phone, orderNo, req.body.status, storeName);
       }
+    }
+
+    if (transitionedToCompleted) {
+      await persistDailySalesReportForStall(updatedOrder.stallId, new Date());
     }
 
     res.status(200).json(updatedOrder);
