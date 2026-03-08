@@ -115,7 +115,7 @@ const persistDailySalesReportForStall = async (stallId, date = new Date()) => {
   const completedOrders = await Order.find({
     stallId,
     status: 'completed',
-    createdAt: { $gte: dayStart, $lt: dayEnd }
+    updatedAt: { $gte: dayStart, $lt: dayEnd }
   });
 
   const totalRevenue = completedOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
@@ -179,7 +179,7 @@ router.get('/report/daily', async (req, res) => {
 
     const query = {
       status: 'completed',
-      createdAt: { $gte: reportDate, $lt: nextDate }
+      updatedAt: { $gte: reportDate, $lt: nextDate }
     };
 
     if (requester?.role === 'stall_staff') {
