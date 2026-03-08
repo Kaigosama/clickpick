@@ -11,6 +11,8 @@ const { sendStatusSMS } = require('../utils/smsService');
 const { GRACE_PERIOD_MINUTES, processExpiredReadyOrders } = require('../utils/orderGraceService');
 const { deductInventoryForOrder, restoreInventoryForOrder } = require('../utils/inventoryService');
 
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+
 const uploadRefundProof = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -101,21 +103,43 @@ const normalizeOrderItems = (items = [], sharedNote = '') => {
   }));
 };
 
+const getManilaDateKey = (date = new Date()) => {
+  const shifted = new Date(date.getTime() + MANILA_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getManilaDayRange = (dateKeyInput) => {
+  const dateKey = String(dateKeyInput || '').trim() || getManilaDateKey(new Date());
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (!match) {
+    throw new Error('Invalid date format. Use YYYY-MM-DD.');
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const dayStartUtc = new Date(Date.UTC(year, month - 1, day) - MANILA_OFFSET_MS);
+  const nextDayUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60 * 1000);
+
+  return { dateKey, dayStartUtc, nextDayUtc };
+};
+
 const persistDailySalesReportForStall = async (stallId, date = new Date()) => {
   if (!stallId) {
     return;
   }
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const { dayStartUtc, nextDayUtc } = getManilaDayRange(getManilaDateKey(date));
 
   const completedOrders = await Order.find({
     stallId,
     status: 'completed',
-    updatedAt: { $gte: dayStart, $lt: dayEnd }
+    updatedAt: { $gte: dayStartUtc, $lt: nextDayUtc }
   });
 
   const totalRevenue = completedOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
@@ -129,7 +153,7 @@ const persistDailySalesReportForStall = async (stallId, date = new Date()) => {
   });
 
   await SalesReport.findOneAndUpdate(
-    { stallId, reportDate: dayStart },
+    { stallId, reportDate: dayStartUtc },
     {
       $set: {
         totalOrders: completedOrders.length,
@@ -166,20 +190,18 @@ router.get('/', async (req, res) => {
 router.get('/report/daily', async (req, res) => {
   try {
     const requester = await getRequesterFromToken(req);
-    const requestedDateRaw = String(req.query.date || '').trim();
-    const reportDate = requestedDateRaw ? new Date(requestedDateRaw) : new Date();
-
-    if (Number.isNaN(reportDate.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD.' });
+    let range;
+    try {
+      range = getManilaDayRange(req.query.date);
+    } catch (dateErr) {
+      return res.status(400).json({ message: dateErr.message });
     }
 
-    reportDate.setHours(0, 0, 0, 0);
-    const nextDate = new Date(reportDate);
-    nextDate.setDate(nextDate.getDate() + 1);
+    const { dateKey, dayStartUtc, nextDayUtc } = range;
 
     const query = {
       status: 'completed',
-      updatedAt: { $gte: reportDate, $lt: nextDate }
+      updatedAt: { $gte: dayStartUtc, $lt: nextDayUtc }
     };
 
     if (requester?.role === 'stall_staff') {
@@ -203,7 +225,7 @@ router.get('/report/daily', async (req, res) => {
     const effectiveStallId = requester?.role === 'stall_staff' ? requester._id : (req.query.stallId || null);
     if (effectiveStallId) {
       await SalesReport.findOneAndUpdate(
-        { stallId: effectiveStallId, reportDate },
+        { stallId: effectiveStallId, reportDate: dayStartUtc },
         {
           $set: {
             totalOrders: orders.length,
@@ -217,8 +239,8 @@ router.get('/report/daily', async (req, res) => {
     }
 
     res.status(200).json({
-      date: reportDate.toDateString(),
-      reportDate,
+      date: dateKey,
+      reportDate: dayStartUtc,
       totalOrders: orders.length,
       totalRevenue,
       itemsSold: itemBreakdown
