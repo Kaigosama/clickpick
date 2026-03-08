@@ -252,6 +252,15 @@ const MyOrders = () => {
     return status === 'completed' || status === 'cancelled' || paymentStatus === 'rejected';
   };
 
+  const hasActivePaidGcashOrder = orders.some((order) => {
+    const status = String(order?.status || '').toLowerCase();
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+
+    const isActiveOrder = ['pending', 'preparing', 'ready'].includes(status);
+    return isActiveOrder && paymentMethod === 'gcash' && paymentStatus === 'paid';
+  });
+
   const activeOrders = orders.filter((order) => !isHistoryOrder(order));
 
   const getStoreName = (order) => {
@@ -351,6 +360,15 @@ const MyOrders = () => {
   };
 
   useEffect(() => {
+    if (!hasActivePaidGcashOrder) {
+      return;
+    }
+
+    setDraftGcashSession(null);
+    localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+  }, [hasActivePaidGcashOrder]);
+
+  useEffect(() => {
     const remaining = getDraftGcashTimeLeftMs();
     if (remaining === null) return;
     if (remaining <= 0) {
@@ -395,7 +413,7 @@ const MyOrders = () => {
           </div>
         )}
 
-        {!activeGcashSession && draftGcashSession && (
+        {!activeGcashSession && draftGcashSession && !hasActivePaidGcashOrder && (
           <div className="mb-8 bg-white border-2 border-amber-300 rounded-lg shadow p-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
