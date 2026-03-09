@@ -643,7 +643,8 @@ const StallMenu = () => {
       .filter((order) => {
         const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
         const refundStatus = String(order?.refundStatus || '').toLowerCase();
-        return paymentMethod === 'gcash' && !['proof_sent', 'confirmed'].includes(refundStatus);
+        const refundRequired = order?.refundRequired === true;
+        return paymentMethod === 'gcash' && refundRequired && refundStatus === 'pending';
       })
       .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
   };
@@ -653,7 +654,8 @@ const StallMenu = () => {
       .filter((order) => {
         const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
         const refundStatus = String(order?.refundStatus || '').toLowerCase();
-        return paymentMethod === 'gcash' && refundStatus === 'proof_sent';
+        const refundRequired = order?.refundRequired === true;
+        return paymentMethod === 'gcash' && refundRequired && refundStatus === 'proof_sent';
       })
       .sort((a, b) => new Date(b.refundProofSentAt || b.updatedAt || b.createdAt) - new Date(a.refundProofSentAt || a.updatedAt || a.createdAt));
   };

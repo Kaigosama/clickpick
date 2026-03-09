@@ -38,17 +38,26 @@ const MyOrders = () => {
       const parsed = JSON.parse(raw);
       if (!parsed?.expiresAt) return;
 
+      // Draft resume is only valid while the customer still has cart items to upload.
+      if (!cartItems.length) {
+        localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+        setDraftGcashSession(null);
+        return;
+      }
+
       const remainingMs = new Date(parsed.expiresAt).getTime() - Date.now();
       if (remainingMs <= 0) {
         localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+        setDraftGcashSession(null);
         return;
       }
 
       setDraftGcashSession(parsed);
     } catch (err) {
       localStorage.removeItem(ACTIVE_GCASH_DRAFT_KEY);
+      setDraftGcashSession(null);
     }
-  }, []);
+  }, [cartItems]);
 
   useEffect(() => {
     if (!user) navigate('/');
@@ -413,7 +422,7 @@ const MyOrders = () => {
           </div>
         )}
 
-        {!activeGcashSession && draftGcashSession && !hasActivePaidGcashOrder && (
+        {!activeGcashSession && draftGcashSession && !hasActivePaidGcashOrder && cartItems.length > 0 && (
           <div className="mb-8 bg-white border-2 border-amber-300 rounded-lg shadow p-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>

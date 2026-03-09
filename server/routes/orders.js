@@ -485,10 +485,12 @@ router.post('/:id/refund-proof', uploadRefundProof.single('refundProof'), async 
     }
 
     const refundStatus = String(order.refundStatus || '').toLowerCase();
+    const refundRequired = order.refundRequired === true;
     const canSubmitRefundProof =
       String(order.paymentMethod || '').toLowerCase() === 'gcash' &&
       String(order.status || '').toLowerCase() === 'cancelled' &&
-      !['proof_sent', 'confirmed'].includes(refundStatus);
+      refundRequired &&
+      refundStatus === 'pending';
 
     if (!canSubmitRefundProof) {
       return res.status(400).json({ message: 'Order is not eligible for refund proof submission' });

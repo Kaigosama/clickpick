@@ -28,16 +28,41 @@ const PaymentWaiting = () => {
   useEffect(() => {
     let isMounted = true;
 
+    const clearActiveGcashSessionKeys = () => {
+      localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
+      localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
+    };
+
     const resolveOrderId = async () => {
       try {
         const fromState = String(location.state?.orderId || '').trim();
         if (fromState) {
-          localStorage.setItem(ACTIVE_GCASH_ORDER_KEY, fromState);
-          if (location.state?.expiresAt) {
-            localStorage.setItem(ACTIVE_GCASH_EXPIRES_AT_KEY, String(location.state.expiresAt));
+          const stateStatusRes = await api.get(`/payments/gcash-status/${fromState}`).catch(() => null);
+          const stateStatus = String(stateStatusRes?.data?.status || '').toLowerCase();
+
+          if (stateStatus === 'pending') {
+            localStorage.setItem(ACTIVE_GCASH_ORDER_KEY, fromState);
+            if (location.state?.expiresAt) {
+              localStorage.setItem(ACTIVE_GCASH_EXPIRES_AT_KEY, String(location.state.expiresAt));
+            }
+
+            if (isMounted) {
+              setOrderId(fromState);
+              setOrderNumber(stateStatusRes?.data?.orderNumber || null);
+              setQueueNumber(stateStatusRes?.data?.queueNumber || null);
+              setTimeLeftSeconds(
+                Number.isFinite(stateStatusRes?.data?.timeRemainingSeconds)
+                  ? stateStatusRes.data.timeRemainingSeconds
+                  : null
+              );
+              setIsResolvingSession(false);
+            }
+            return;
           }
+
+          clearActiveGcashSessionKeys();
           if (isMounted) {
-            setOrderId(fromState);
+            setStatus('no_active_session');
             setIsResolvingSession(false);
           }
           return;
@@ -48,7 +73,7 @@ const PaymentWaiting = () => {
           const statusRes = await api.get(`/payments/gcash-status/${fromStorage}`).catch(() => null);
           const statusValue = String(statusRes?.data?.status || '').toLowerCase();
 
-          if (statusValue) {
+          if (statusValue === 'pending') {
             if (isMounted) {
               setOrderId(fromStorage);
               setOrderNumber(statusRes?.data?.orderNumber || null);
@@ -63,8 +88,7 @@ const PaymentWaiting = () => {
             return;
           }
 
-          localStorage.removeItem(ACTIVE_GCASH_ORDER_KEY);
-          localStorage.removeItem(ACTIVE_GCASH_EXPIRES_AT_KEY);
+          clearActiveGcashSessionKeys();
         }
 
         const response = await api.get('/payments/gcash-active-session');

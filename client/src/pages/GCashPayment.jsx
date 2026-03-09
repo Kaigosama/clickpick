@@ -88,6 +88,13 @@ const GCashPayment = () => {
     const selectedStallId = getSelectedStallId();
     const existingDraft = readGcashDraftSession();
 
+    if (!cartItems.length && !location.state?.stallId) {
+      clearDraftSession();
+      setDraftSession(null);
+      setDraftExpiresAtMs(null);
+      return;
+    }
+
     if (existingDraft?.expiresAt) {
       const existingExpiryMs = new Date(existingDraft.expiresAt).getTime();
       const remainingSeconds = Math.max(0, Math.ceil((existingExpiryMs - Date.now()) / 1000));
